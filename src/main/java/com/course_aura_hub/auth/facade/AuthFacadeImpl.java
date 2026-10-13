@@ -3,7 +3,6 @@ package com.course_aura_hub.auth.facade;
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
 import com.course_aura_hub.auth.dto.OAuth2UserDto;
-import com.course_aura_hub.auth.dto.RefreshTokenRequest;
 import com.course_aura_hub.auth.dto.RegisterRequest;
 import com.course_aura_hub.auth.exception.AuthException;
 import com.course_aura_hub.auth.service.AuthService;
@@ -33,9 +32,9 @@ public class AuthFacadeImpl implements AuthFacade {
     }
 
     @Override
-    public AuthResponse refreshToken(RefreshTokenRequest request) {
+    public AuthResponse refreshToken(String refreshToken) {
         log.info("Facade orchestrating token refresh");
-        return authService.refreshToken(request.refreshToken());
+        return authService.refreshToken(refreshToken);
     }
 
     @Override
