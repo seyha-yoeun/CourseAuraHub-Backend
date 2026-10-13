@@ -14,5 +14,8 @@ public record LoginRequest(
 
         @Schema(description = "User's password", example = "P@ssword123")
         @NotBlank(message = "Password is required")
-        String password
+        String password,
+
+        @Schema(description = "Extend refresh token expiry to 30 days (remember me)", example = "false")
+        boolean rememberMe
 ) {}

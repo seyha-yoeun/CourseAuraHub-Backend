@@ -23,6 +23,7 @@ public interface AuthService {
 
     /**
      * Generates a fresh access and refresh token pair using an existing valid refresh token.
+     * Implements token rotation: the old refresh token is invalidated.
      */
     AuthResponse refreshToken(String refreshToken);
 
@@ -35,4 +36,9 @@ public interface AuthService {
      * Builds standard AuthResponse with freshly minted JWT tokens for a given user.
      */
     AuthResponse createAuthResponse(User user);
+
+    /**
+     * Builds AuthResponse with optional remember-me extended refresh token expiry.
+     */
+    AuthResponse createAuthResponse(User user, boolean rememberMe);
 }
