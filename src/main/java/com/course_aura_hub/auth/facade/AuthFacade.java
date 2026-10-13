@@ -3,7 +3,6 @@ package com.course_aura_hub.auth.facade;
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
 import com.course_aura_hub.auth.dto.OAuth2UserDto;
-import com.course_aura_hub.auth.dto.RefreshTokenRequest;
 import com.course_aura_hub.auth.dto.RegisterRequest;
 
 /**
@@ -25,7 +24,7 @@ public interface AuthFacade {
     /**
      * Issues a refreshed access token and refresh token from a valid refresh token.
      */
-    AuthResponse refreshToken(RefreshTokenRequest request);
+    AuthResponse refreshToken(String refreshToken);
 
     /**
      * Revokes all tokens for a user (logout).
@@ -41,6 +40,5 @@ public interface AuthFacade {
      * Handles provider OAuth2 callback exchange and user provisioning.
      */
     AuthResponse processOAuth2Callback(String provider, String code, String state);
-
 
 }

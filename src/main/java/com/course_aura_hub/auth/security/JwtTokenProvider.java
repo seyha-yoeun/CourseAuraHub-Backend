@@ -59,11 +59,15 @@ public class JwtTokenProvider {
     }
 
     public String generateRefreshToken(User user) {
+        return generateRefreshToken(user, jwtProperties.refreshTokenExpiration());
+    }
+
+    public String generateRefreshToken(User user, long customExpiration) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("userId", user.getId().toString());
         extraClaims.put("tokenType", "REFRESH");
 
-        return buildToken(extraClaims, user.getEmail(), jwtProperties.refreshTokenExpiration());
+        return buildToken(extraClaims, user.getEmail(), customExpiration);
     }
 
     private String buildToken(Map<String, Object> extraClaims, String subject, long expiration) {

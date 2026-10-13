@@ -2,6 +2,9 @@ server:
   port: ${SERVER_PORT:8080}
 
 spring:
+  config:
+    import: "optional:file:.env[.properties]"
+
   application:
     name: course-aura-hub
 
@@ -71,8 +74,20 @@ jwt:
 
 app:
   oauth2:
-    # URL to redirect the user after OAuth2 login succeeds (appends ?token=...&refreshToken=...)
+    # URL to redirect the user after OAuth2 login succeeds (clean redirect, tokens in cookies)
     redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
+
+  cookie:
+    secure: ${COOKIE_SECURE:false}
+    same-site: ${COOKIE_SAME_SITE:lax}
+    domain: ${COOKIE_DOMAIN:}
+    access-token-name: ${COOKIE_ACCESS_TOKEN_NAME:access_token}
+    refresh-token-name: ${COOKIE_REFRESH_TOKEN_NAME:refresh_token}
+    path: ${COOKIE_PATH:/}
+    # Token max age in seconds (access: 15min, refresh: 30 days for remember-me)
+    access-token-max-age: ${COOKIE_ACCESS_TOKEN_MAX_AGE:900}
+    refresh-token-max-age: ${COOKIE_REFRESH_TOKEN_MAX_AGE:2592000}
+    http-only: ${COOKIE_HTTP_ONLY:true}
 
 springdoc:
   api-docs:

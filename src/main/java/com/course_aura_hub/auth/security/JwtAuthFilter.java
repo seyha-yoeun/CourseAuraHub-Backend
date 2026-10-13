@@ -1,7 +1,9 @@
 package com.course_aura_hub.auth.security;
 
+import com.course_aura_hub.auth.config.CookieProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -12,9 +14,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 @Slf4j
 @Component
@@ -26,6 +30,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService userDetailsService;
+    private final CookieProperties cookieProperties;
 
     @Override
     protected void doFilterInternal(
@@ -34,14 +39,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        final String authHeader = request.getHeader(AUTHORIZATION_HEADER);
+        String jwt = resolveToken(request);
 
-        if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        final String jwt = authHeader.substring(BEARER_PREFIX.length()).trim();
 
         try {
             final String userEmail = jwtTokenProvider.extractUsername(jwt);
@@ -61,9 +64,34 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         } catch (Exception ex) {
             log.warn("Cannot set user authentication from token: {}", ex.getMessage());
-            // Proceed through the chain; SecurityContext will be unauthenticated and handled by AuthenticationEntryPoint
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String cookieToken = getTokenFromCookie(request, cookieProperties.accessTokenName());
+        if (StringUtils.hasText(cookieToken)) {
+            return cookieToken;
+        }
+
+        String authHeader = request.getHeader(AUTHORIZATION_HEADER);
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
+            return authHeader.substring(BEARER_PREFIX.length()).trim();
+        }
+
+        return null;
+    }
+
+    private String getTokenFromCookie(HttpServletRequest request, String cookieName) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+        return Arrays.stream(cookies)
+                .filter(cookie -> cookieName.equals(cookie.getName()))
+                .map(Cookie::getValue)
+                .findFirst()
+                .orElse(null);
     }
 }

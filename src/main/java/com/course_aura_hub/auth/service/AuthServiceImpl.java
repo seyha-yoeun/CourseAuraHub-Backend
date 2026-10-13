@@ -1,5 +1,6 @@
 package com.course_aura_hub.auth.service;
 
+import com.course_aura_hub.auth.config.JwtProperties;
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
 import com.course_aura_hub.auth.dto.RegisterRequest;
@@ -35,6 +36,9 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
     private final UserMapper userMapper;
+    private final JwtProperties jwtProperties;
+
+    private static final long REMEMBER_ME_REFRESH_TOKEN_EXPIRATION = 30L * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
     @Override
     @Transactional
@@ -87,7 +91,7 @@ public class AuthServiceImpl implements AuthService {
 
         handleSuccessfulLogin(user);
         log.info("Successfully authenticated user: {}", normalizedEmail);
-        return createAuthResponse(user);
+        return createAuthResponse(user, request.rememberMe());
     }
 
     private void handleFailedLogin(User user) {
@@ -113,6 +117,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new AuthException("Refresh token is required");
+        }
+
         if (jwtTokenProvider.isTokenExpired(refreshToken)) {
             throw new TokenExpiredException("Refresh token has expired. Please login again.");
         }
@@ -147,21 +155,28 @@ public class AuthServiceImpl implements AuthService {
             throw new AuthException("Invalid refresh token");
         }
 
+        // Token rotation: invalidate old refresh token and issue new pair
         return createAuthResponse(user);
     }
 
 @Override
     @Transactional
     public AuthResponse createAuthResponse(User user) {
+        return createAuthResponse(user, false);
+    }
+
+    @Transactional
+    public AuthResponse createAuthResponse(User user, boolean rememberMe) {
         String accessToken = jwtTokenProvider.generateAccessToken(user);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user);
+        long refreshExpiration = rememberMe ? REMEMBER_ME_REFRESH_TOKEN_EXPIRATION : jwtProperties.refreshTokenExpiration();
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user, refreshExpiration);
         long expiresIn = jwtTokenProvider.getAccessTokenExpiration();
 
         user.setAccessToken(accessToken);
         user.setRefreshToken(jwtTokenProvider.hashRefreshToken(refreshToken));
         user.setTokensIssuedAt(Instant.now());
         user.setRefreshTokenExpiresAt(
-                Instant.now().plusMillis(jwtTokenProvider.getRefreshTokenExpiration())
+                Instant.now().plusMillis(refreshExpiration)
         );
 
         userRepository.save(user);
@@ -203,7 +218,3 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 }
-
-
-
-
