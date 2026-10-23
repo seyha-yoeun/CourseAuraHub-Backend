@@ -3,6 +3,7 @@ package com.course_aura_hub.auth;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Configuration;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
 
 @Configuration
 public class TestcontainersConfiguration {

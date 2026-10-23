@@ -4,6 +4,7 @@ import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
 import com.course_aura_hub.auth.dto.OAuth2UserDto;
 import com.course_aura_hub.auth.dto.RegisterRequest;
+import com.course_aura_hub.auth.dto.UserResponse;
 import com.course_aura_hub.auth.exception.AuthException;
 import com.course_aura_hub.auth.service.AuthService;
 import com.course_aura_hub.auth.service.OAuth2Service;
@@ -53,5 +54,11 @@ public class AuthFacadeImpl implements AuthFacade {
     public void logout(String refreshToken) {
         log.info("Facade orchestrating logout");
         authService.logout(refreshToken);
+    }
+
+    @Override
+    public UserResponse getCurrentUser(String email) {
+        log.info("Facade orchestrating current user lookup");
+        return authService.getCurrentUser(email);
     }
 }

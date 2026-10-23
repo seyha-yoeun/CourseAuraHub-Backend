@@ -1,6 +1,8 @@
 package com.course_aura_hub.auth.security;
 
 import com.course_aura_hub.auth.config.CookieProperties;
+import com.course_aura_hub.auth.exception.TokenExpiredException;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -27,6 +29,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ACCESS_TOKEN_TYPE = "ACCESS";
 
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService userDetailsService;
@@ -47,12 +50,21 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         try {
-            final String userEmail = jwtTokenProvider.extractUsername(jwt);
+            Claims claims = jwtTokenProvider.extractAllClaims(jwt);
+            String tokenType = claims.get("tokenType", String.class);
 
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (!ACCESS_TOKEN_TYPE.equalsIgnoreCase(tokenType)) {
+                log.warn("Rejected non-access token on request: {}", request.getRequestURI());
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String userEmail = claims.getSubject();
+
+            if (StringUtils.hasText(userEmail) && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
 
-                if (jwtTokenProvider.validateToken(jwt, userDetails.getUsername())) {
+                if (userDetails.isEnabled()) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
@@ -62,6 +74,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             }
+        } catch (TokenExpiredException ex) {
+            log.warn("Expired JWT: {}", ex.getMessage());
         } catch (Exception ex) {
             log.warn("Cannot set user authentication from token: {}", ex.getMessage());
         }
@@ -70,17 +84,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     private String resolveToken(HttpServletRequest request) {
-        String cookieToken = getTokenFromCookie(request, cookieProperties.accessTokenName());
-        if (StringUtils.hasText(cookieToken)) {
-            return cookieToken;
-        }
-
         String authHeader = request.getHeader(AUTHORIZATION_HEADER);
         if (StringUtils.hasText(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
-            return authHeader.substring(BEARER_PREFIX.length()).trim();
+            String headerToken = authHeader.substring(BEARER_PREFIX.length()).trim();
+            if (StringUtils.hasText(headerToken)) {
+                return headerToken;
+            }
         }
 
-        return null;
+        return getTokenFromCookie(request, cookieProperties.accessTokenName());
     }
 
     private String getTokenFromCookie(HttpServletRequest request, String cookieName) {

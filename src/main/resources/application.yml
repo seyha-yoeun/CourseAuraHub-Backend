@@ -84,10 +84,13 @@ app:
     access-token-name: ${COOKIE_ACCESS_TOKEN_NAME:access_token}
     refresh-token-name: ${COOKIE_REFRESH_TOKEN_NAME:refresh_token}
     path: ${COOKIE_PATH:/}
-    # Token max age in seconds (access: 15min, refresh: 30 days for remember-me)
+    # Token max age in seconds (access: 15min, refresh: 7 days; remember-me overrides refresh to 30 days)
     access-token-max-age: ${COOKIE_ACCESS_TOKEN_MAX_AGE:900}
-    refresh-token-max-age: ${COOKIE_REFRESH_TOKEN_MAX_AGE:2592000}
+    refresh-token-max-age: ${COOKIE_REFRESH_TOKEN_MAX_AGE:604800}
     http-only: ${COOKIE_HTTP_ONLY:true}
+
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
 
 springdoc:
   api-docs:
