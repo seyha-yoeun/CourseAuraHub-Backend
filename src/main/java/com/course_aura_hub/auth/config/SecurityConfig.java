@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -78,11 +79,31 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
+                                "/api/v1/auth/csrf",
                                 "/api/v1/auth/oauth2/**",
                                 "/api/v1/oauth2/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**"
                         ).permitAll()
+                        // Client-safe platform branding
+                        .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").authenticated()
+                        // Admin-only management resources
+                        .requestMatchers(
+                                "/api/v1/students",
+                                "/api/v1/students/**",
+                                "/api/v1/stats",
+                                "/api/v1/stats/**",
+                                "/api/v1/enrollments",
+                                "/api/v1/enrollments/**",
+                                "/api/v1/settings",
+                                "/api/v1/settings/**"
+                        ).hasRole("ADMIN")
+                        // Course writes are admin-only, reads are available to all authenticated users
+                        .requestMatchers(HttpMethod.POST, "/api/v1/courses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/courses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/courses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/courses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/courses/**").authenticated()
                         // Swagger & OpenAPI documentation
                         .requestMatchers(
                                 "/v3/api-docs/**",
@@ -129,8 +150,16 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "X-CSRF-TOKEN"));
-        configuration.setExposedHeaders(List.of("Authorization", "X-CSRF-TOKEN"));
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "X-Requested-With",
+                "Accept",
+                "Origin",
+                "X-CSRF-TOKEN",
+                "X-XSRF-TOKEN"
+        ));
+        configuration.setExposedHeaders(List.of("Authorization", "X-CSRF-TOKEN", "X-XSRF-TOKEN"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
