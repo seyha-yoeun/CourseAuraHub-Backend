@@ -1,0 +1,555 @@
+{
+  "courses": [
+    {
+      "id": 1,
+      "slug": "nuxt-3-mastery",
+      "title": "Nuxt 3 Mastery: From Zero to Hero",
+      "description": "The most comprehensive Nuxt 3 course covering SSR, SSG, hybrid rendering, composables, Nitro server, and deployment strategies. Perfect for Vue developers ready to level up.",
+      "instructor": "Alex Chen",
+      "price": 129.99,
+      "originalPrice": 199.99,
+      "status": "published",
+      "category": "Web Development",
+      "level": "Intermediate",
+      "thumbnail": "https://images.unsplash.com/photo-1618477388954-7852f32655ec?w=800&h=450&fit=crop",
+      "rating": 4.9,
+      "totalStudents": 3842,
+      "totalLessons": 98,
+      "totalHours": 24.5,
+      "revenue": 498221.58,
+      "completionRate": 78,
+      "tags": [
+        "Nuxt 3",
+        "Vue 3",
+        "SSR",
+        "TypeScript"
+      ],
+      "createdAt": "2024-01-15",
+      "updatedAt": "2026-09-20",
+      "monthlyEnrollments": [
+        210,
+        280,
+        340,
+        420,
+        380,
+        490,
+        520,
+        610,
+        580,
+        720,
+        690,
+        780
+      ],
+      "monthlyRevenue": [
+        27279,
+        36374,
+        44146,
+        54558,
+        49362,
+        63635,
+        67548,
+        79287,
+        75362,
+        93518,
+        89631,
+        101362
+      ]
+    },
+    {
+      "id": 2,
+      "slug": "vue3-composition-api",
+      "title": "Vue 3 Composition API Deep Dive",
+      "description": "Master the Vue 3 Composition API with real-world patterns. Learn reactive state, composables, Pinia state management, and advanced component design patterns used in production.",
+      "instructor": "Maria Santos",
+      "price": 89.99,
+      "originalPrice": 149.99,
+      "status": "published",
+      "category": "Web Development",
+      "level": "Advanced",
+      "thumbnail": "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&h=450&fit=crop",
+      "rating": 4.8,
+      "totalStudents": 2651,
+      "totalLessons": 74,
+      "totalHours": 18.2,
+      "revenue": 238467.49,
+      "completionRate": 82,
+      "tags": [
+        "Vue 3",
+        "Composition API",
+        "Pinia",
+        "TypeScript"
+      ],
+      "createdAt": "2024-03-10",
+      "updatedAt": "2026-08-15",
+      "monthlyEnrollments": [
+        150,
+        190,
+        220,
+        280,
+        310,
+        350,
+        390,
+        420,
+        440,
+        460,
+        480,
+        510
+      ],
+      "monthlyRevenue": [
+        13499,
+        17099,
+        19799,
+        25199,
+        27899,
+        31499,
+        35099,
+        37799,
+        39599,
+        41399,
+        43199,
+        45899
+      ]
+    },
+    {
+      "id": 3,
+      "slug": "typescript-for-vue-devs",
+      "title": "TypeScript for Vue Developers",
+      "description": "Supercharge your Vue projects with TypeScript. From type fundamentals to advanced generics, decorators, and fully typed Vue components with strict mode enabled.",
+      "instructor": "James Wright",
+      "price": 74.99,
+      "originalPrice": 119.99,
+      "status": "published",
+      "category": "Programming",
+      "level": "Beginner",
+      "thumbnail": "https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=800&h=450&fit=crop",
+      "rating": 4.7,
+      "totalStudents": 1923,
+      "totalLessons": 56,
+      "totalHours": 14,
+      "revenue": 144197.77,
+      "completionRate": 71,
+      "tags": [
+        "TypeScript",
+        "Vue 3",
+        "JavaScript"
+      ],
+      "createdAt": "2024-05-22",
+      "updatedAt": "2026-07-30",
+      "monthlyEnrollments": [
+        80,
+        110,
+        140,
+        170,
+        200,
+        220,
+        240,
+        250,
+        230,
+        220,
+        200,
+        180
+      ],
+      "monthlyRevenue": [
+        5999,
+        8249,
+        10499,
+        12749,
+        14999,
+        16499,
+        17999,
+        18749,
+        17249,
+        16499,
+        14999,
+        13499
+      ]
+    },
+    {
+      "id": 4,
+      "slug": "tailwind-ui-design-system",
+      "title": "Tailwind CSS UI Design Systems",
+      "description": "Build stunning, scalable design systems with Tailwind CSS. Master component architecture, dark mode, custom plugins, animations, and responsive design at enterprise scale.",
+      "instructor": "Sofia Park",
+      "price": 99.99,
+      "originalPrice": 159.99,
+      "status": "draft",
+      "category": "Design",
+      "level": "Intermediate",
+      "thumbnail": "https://images.unsplash.com/photo-1561736778-92e52a7769ef?w=800&h=450&fit=crop",
+      "rating": 4.9,
+      "totalStudents": 2104,
+      "totalLessons": 68,
+      "totalHours": 17,
+      "revenue": 210379.96,
+      "completionRate": 85,
+      "tags": [
+        "Tailwind CSS",
+        "UI Design",
+        "CSS",
+        "Design System"
+      ],
+      "createdAt": "2024-07-01",
+      "updatedAt": "2026-10-06",
+      "monthlyEnrollments": [
+        120,
+        155,
+        180,
+        210,
+        240,
+        270,
+        290,
+        310,
+        300,
+        290,
+        280,
+        270
+      ],
+      "monthlyRevenue": [
+        11999,
+        15499,
+        17999,
+        20999,
+        23999,
+        26999,
+        28999,
+        30999,
+        29999,
+        28999,
+        27999,
+        26999
+      ]
+    },
+    {
+      "id": 6,
+      "slug": "docker-kubernetes-devops",
+      "title": "Docker & Kubernetes for Web Developers",
+      "description": "Containerize and orchestrate your web apps like a DevOps pro. From Docker basics to Kubernetes clusters, CI/CD pipelines, and cloud deployment on AWS and GCP.",
+      "instructor": "Alex Chen",
+      "price": 119.99,
+      "originalPrice": 189.99,
+      "status": "archived",
+      "category": "DevOps",
+      "level": "Advanced",
+      "thumbnail": "https://images.unsplash.com/photo-1605745341112-85968b19335b?w=800&h=450&fit=crop",
+      "rating": 4.6,
+      "totalStudents": 892,
+      "totalLessons": 64,
+      "totalHours": 16,
+      "revenue": 107010.08,
+      "completionRate": 63,
+      "tags": [
+        "Docker",
+        "Kubernetes",
+        "DevOps",
+        "AWS"
+      ],
+      "createdAt": "2023-11-01",
+      "updatedAt": "2025-12-01",
+      "monthlyEnrollments": [
+        120,
+        100,
+        90,
+        80,
+        70,
+        60,
+        50,
+        45,
+        40,
+        35,
+        30,
+        25
+      ],
+      "monthlyRevenue": [
+        14399,
+        11999,
+        10799,
+        9599,
+        8399,
+        7199,
+        5999,
+        5399,
+        4799,
+        4199,
+        3599,
+        2999
+      ]
+    }
+  ],
+  "students": [
+    {
+      "id": 1,
+      "name": "Emma Thompson",
+      "email": "emma.thompson@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Emma&backgroundColor=b6e3f4",
+      "enrolledCourses": [
+        1,
+        2,
+        4
+      ],
+      "totalSpent": 319.97,
+      "joinedAt": "2024-02-15",
+      "lastActive": "2026-10-05",
+      "status": "active",
+      "completedCourses": [
+        2
+      ],
+      "country": "United States"
+    },
+    {
+      "id": 2,
+      "name": "Lucas Oliveira",
+      "email": "lucas.oliveira@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Lucas&backgroundColor=c0aede",
+      "enrolledCourses": [
+        1,
+        3
+      ],
+      "totalSpent": 204.98,
+      "joinedAt": "2024-04-20",
+      "lastActive": "2026-10-04",
+      "status": "active",
+      "completedCourses": [
+        1
+      ],
+      "country": "Brazil"
+    },
+    {
+      "id": 3,
+      "name": "Yuki Tanaka",
+      "email": "yuki.tanaka@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Yuki&backgroundColor=ffd5dc",
+      "enrolledCourses": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "totalSpent": 394.96,
+      "joinedAt": "2024-01-30",
+      "lastActive": "2026-10-06",
+      "status": "active",
+      "completedCourses": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "country": "Japan"
+    },
+    {
+      "id": 4,
+      "name": "Carlos Mendez",
+      "email": "carlos.mendez@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Carlos&backgroundColor=ffdfbf",
+      "enrolledCourses": [
+        2
+      ],
+      "totalSpent": 89.99,
+      "joinedAt": "2024-06-10",
+      "lastActive": "2026-09-28",
+      "status": "inactive",
+      "completedCourses": [],
+      "country": "Mexico"
+    },
+    {
+      "id": 5,
+      "name": "Aisha Patel",
+      "email": "aisha.patel@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Aisha&backgroundColor=d1f4cc",
+      "enrolledCourses": [
+        1,
+        4
+      ],
+      "totalSpent": 229.98,
+      "joinedAt": "2024-08-22",
+      "lastActive": "2026-10-05",
+      "status": "active",
+      "completedCourses": [],
+      "country": "India"
+    },
+    {
+      "id": 6,
+      "name": "Oliver Schmidt",
+      "email": "oliver.schmidt@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Oliver&backgroundColor=b6e3f4",
+      "enrolledCourses": [
+        1,
+        2,
+        3,
+        4,
+        6
+      ],
+      "totalSpent": 504.95,
+      "joinedAt": "2023-12-05",
+      "lastActive": "2026-10-03",
+      "status": "active",
+      "completedCourses": [
+        1,
+        2,
+        3
+      ],
+      "country": "Germany"
+    },
+    {
+      "id": 7,
+      "name": "Priya Sharma",
+      "email": "priya.sharma@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Priya&backgroundColor=ffd5dc",
+      "enrolledCourses": [
+        3,
+        4
+      ],
+      "totalSpent": 174.98,
+      "joinedAt": "2025-01-14",
+      "lastActive": "2026-10-01",
+      "status": "active",
+      "completedCourses": [
+        4
+      ],
+      "country": "India"
+    },
+    {
+      "id": 8,
+      "name": "Ethan Williams",
+      "email": "ethan.williams@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Ethan&backgroundColor=c0aede",
+      "enrolledCourses": [
+        1
+      ],
+      "totalSpent": 129.99,
+      "joinedAt": "2025-03-08",
+      "lastActive": "2026-09-15",
+      "status": "inactive",
+      "completedCourses": [],
+      "country": "United Kingdom"
+    },
+    {
+      "id": 9,
+      "name": "Sophie Dubois",
+      "email": "sophie.dubois@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=Sophie&backgroundColor=d1f4cc",
+      "enrolledCourses": [
+        1,
+        2,
+        4
+      ],
+      "totalSpent": 319.97,
+      "joinedAt": "2025-05-19",
+      "lastActive": "2026-10-06",
+      "status": "active",
+      "completedCourses": [
+        4
+      ],
+      "country": "France"
+    },
+    {
+      "id": 10,
+      "name": "Min-jun Lee",
+      "email": "minjun.lee@email.com",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=MinJun&backgroundColor=ffdfbf",
+      "enrolledCourses": [
+        1,
+        3
+      ],
+      "totalSpent": 204.98,
+      "joinedAt": "2025-07-01",
+      "lastActive": "2026-10-04",
+      "status": "active",
+      "completedCourses": [],
+      "country": "South Korea"
+    }
+  ],
+  "enrollments": [
+    {
+      "id": 1,
+      "studentId": 9,
+      "courseId": 1,
+      "enrolledAt": "2026-10-06",
+      "amount": 129.99
+    },
+    {
+      "id": 2,
+      "studentId": 7,
+      "courseId": 4,
+      "enrolledAt": "2026-10-05",
+      "amount": 99.99
+    },
+    {
+      "id": 3,
+      "studentId": 10,
+      "courseId": 1,
+      "enrolledAt": "2026-10-04",
+      "amount": 129.99
+    },
+    {
+      "id": 4,
+      "studentId": 5,
+      "courseId": 4,
+      "enrolledAt": "2026-10-04",
+      "amount": 99.99
+    },
+    {
+      "id": 5,
+      "studentId": 3,
+      "courseId": 2,
+      "enrolledAt": "2026-10-03",
+      "amount": 89.99
+    },
+    {
+      "id": 6,
+      "studentId": 6,
+      "courseId": 6,
+      "enrolledAt": "2026-10-03",
+      "amount": 119.99
+    },
+    {
+      "id": 7,
+      "studentId": 1,
+      "courseId": 4,
+      "enrolledAt": "2026-10-02",
+      "amount": 99.99
+    },
+    {
+      "id": 8,
+      "studentId": 2,
+      "courseId": 3,
+      "enrolledAt": "2026-10-01",
+      "amount": 74.99
+    },
+    {
+      "id": 9,
+      "studentId": 4,
+      "courseId": 2,
+      "enrolledAt": "2026-09-30",
+      "amount": 89.99
+    },
+    {
+      "id": 10,
+      "studentId": 8,
+      "courseId": 1,
+      "enrolledAt": "2026-09-28",
+      "amount": 129.99
+    }
+  ],
+  "settings": {
+    "platformName": "CourseAuraHub Academy",
+    "platformTagline": "Master modern web development",
+    "currency": "USD",
+    "defaultLanguage": "en",
+    "notifications": {
+      "newEnrollment": true,
+      "courseCompletion": true,
+      "weeklyReport": true,
+      "marketingEmails": false
+    },
+    "profile": {
+      "name": "Alex Chen",
+      "email": "seyha.aura@courseaurahub.io",
+      "role": "Platform Admin",
+      "avatar": "https://api.dicebear.com/9.x/avataaars/svg?seed=AlexAdmin&backgroundColor=b6e3f4",
+      "bio": "Full-stack developer and course creator with 8+ years of experience in Vue and Nuxt ecosystems.",
+      "website": "https://alexchen.dev",
+      "twitter": "@alexchendev"
+    }
+  }
+}
