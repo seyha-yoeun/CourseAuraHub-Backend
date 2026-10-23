@@ -24,6 +24,7 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Slf4j
@@ -75,6 +76,7 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + expiration);
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .claims(extraClaims)
                 .subject(subject)
                 .issuedAt(now)
@@ -147,6 +149,11 @@ public class JwtTokenProvider {
     }
 
     public boolean matchesRefreshToken(String rawToken, String hashedToken) {
-        return hashRefreshToken(rawToken).equals(hashedToken);
+        if (rawToken == null || hashedToken == null) {
+            return false;
+        }
+        byte[] expectedHash = hashRefreshToken(rawToken).getBytes(StandardCharsets.UTF_8);
+        byte[] storedHash = hashedToken.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(expectedHash, storedHash);
     }
 }

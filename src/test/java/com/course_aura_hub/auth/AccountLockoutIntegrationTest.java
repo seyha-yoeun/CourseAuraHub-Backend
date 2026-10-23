@@ -5,7 +5,7 @@ import com.course_aura_hub.auth.dto.RegisterRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -36,7 +36,7 @@ class AccountLockoutIntegrationTest extends IntegrationTestBase {
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isCreated());
 
-        LoginRequest wrongLoginRequest = new LoginRequest(email, "WrongPassword123");
+        LoginRequest wrongLoginRequest = new LoginRequest(email, "WrongPassword123", false);
 
         for (int i = 0; i < 5; i++) {
             MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
@@ -51,7 +51,7 @@ class AccountLockoutIntegrationTest extends IntegrationTestBase {
             }
         }
 
-        LoginRequest correctLoginRequest = new LoginRequest(email, "P@ssword123");
+        LoginRequest correctLoginRequest = new LoginRequest(email, "P@ssword123", false);
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(correctLoginRequest)))

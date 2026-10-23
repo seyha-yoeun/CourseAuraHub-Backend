@@ -4,8 +4,9 @@ import com.course_aura_hub.auth.config.JwtProperties;
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
 import com.course_aura_hub.auth.dto.RegisterRequest;
-import com.course_aura_hub.auth.exception.AuthException;
+import com.course_aura_hub.auth.dto.UserResponse;
 import com.course_aura_hub.auth.exception.InvalidCredentialsException;
+import com.course_aura_hub.auth.exception.InvalidTokenException;
 import com.course_aura_hub.auth.exception.TokenExpiredException;
 import com.course_aura_hub.auth.exception.UserAlreadyExistsException;
 import com.course_aura_hub.auth.mapper.UserMapper;
@@ -21,6 +22,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -117,49 +119,60 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse refreshToken(String refreshToken) {
-        if (refreshToken == null || refreshToken.isBlank()) {
-            throw new AuthException("Refresh token is required");
-        }
-
-        if (jwtTokenProvider.isTokenExpired(refreshToken)) {
-            throw new TokenExpiredException("Refresh token has expired. Please login again.");
+        if (!StringUtils.hasText(refreshToken)) {
+            throw new InvalidTokenException("Refresh token is required");
         }
 
         Claims claims;
         try {
             claims = jwtTokenProvider.extractAllClaims(refreshToken);
+        } catch (TokenExpiredException ex) {
+            throw ex;
         } catch (Exception ex) {
-            throw new AuthException("Invalid refresh token: " + ex.getMessage());
+            log.warn("Rejected malformed refresh token: {}", ex.getMessage());
+            throw new InvalidTokenException("Invalid refresh token");
         }
 
         String tokenType = claims.get("tokenType", String.class);
         if (!"REFRESH".equalsIgnoreCase(tokenType)) {
-            throw new AuthException("Provided token is not a valid refresh token");
+            throw new InvalidTokenException("Provided token is not a valid refresh token");
         }
 
         String email = claims.getSubject();
+        if (!StringUtils.hasText(email)) {
+            throw new InvalidTokenException("Invalid refresh token");
+        }
+
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new AuthException("User not found for token subject"));
+                .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
 
         if (!user.isEnabled()) {
-            throw new AuthException("User account is disabled");
+            throw new InvalidTokenException("User account is disabled");
         }
 
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
-            throw new AuthException("User account is temporarily locked");
+            throw new InvalidTokenException("User account is temporarily locked");
         }
 
         String storedRefreshToken = user.getRefreshToken();
         if (storedRefreshToken == null || !jwtTokenProvider.matchesRefreshToken(refreshToken, storedRefreshToken)) {
             log.warn("Refresh token mismatch for user: {}", email);
-            throw new AuthException("Invalid refresh token");
+            throw new InvalidTokenException("Invalid refresh token");
         }
 
         // Token rotation: invalidate old refresh token and issue new pair
         return createAuthResponse(user);
     }
 
-@Override
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getCurrentUser(String email) {
+        User user = userRepository.findByEmail(email.trim().toLowerCase())
+                .orElseThrow(() -> new InvalidTokenException("User not found"));
+        return userMapper.toUserResponse(user);
+    }
+
+    @Override
     @Transactional
     public AuthResponse createAuthResponse(User user) {
         return createAuthResponse(user, false);
@@ -172,7 +185,6 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = jwtTokenProvider.generateRefreshToken(user, refreshExpiration);
         long expiresIn = jwtTokenProvider.getAccessTokenExpiration();
 
-        user.setAccessToken(accessToken);
         user.setRefreshToken(jwtTokenProvider.hashRefreshToken(refreshToken));
         user.setTokensIssuedAt(Instant.now());
         user.setRefreshTokenExpiresAt(
