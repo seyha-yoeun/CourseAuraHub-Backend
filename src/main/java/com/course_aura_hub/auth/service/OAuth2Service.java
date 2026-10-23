@@ -21,8 +21,8 @@ import java.util.Optional;
 public class OAuth2Service {
 
     private final UserRepository userRepository;
-    private final JwtTokenProvider jwtTokenProvider;
     private final UserMapper userMapper;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Transactional
     public AuthResponse processOAuth2PostLogin(OAuth2UserDto oAuth2UserDto) {
@@ -59,7 +59,6 @@ public class OAuth2Service {
         String refreshToken = jwtTokenProvider.generateRefreshToken(user);
         long expiresIn = jwtTokenProvider.getAccessTokenExpiration();
 
-        user.setAccessToken(accessToken);
         user.setRefreshToken(jwtTokenProvider.hashRefreshToken(refreshToken));
         user.setTokensIssuedAt(Instant.now());
         user.setRefreshTokenExpiresAt(

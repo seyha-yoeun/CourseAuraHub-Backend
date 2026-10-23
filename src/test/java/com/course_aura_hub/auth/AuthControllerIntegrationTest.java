@@ -6,9 +6,10 @@ import com.course_aura_hub.auth.dto.RefreshTokenRequest;
 import com.course_aura_hub.auth.dto.RegisterRequest;
 import com.course_aura_hub.common.dto.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -16,7 +17,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -43,7 +46,9 @@ class AuthControllerIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.accessToken").exists())
                 .andExpect(jsonPath("$.data.refreshToken").exists())
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.data.email").value(email))
+                .andExpect(header().exists("Set-Cookie"))
                 .andReturn();
 
         String registerResponse = registerResult.getResponse().getContentAsString();
@@ -53,7 +58,7 @@ class AuthControllerIntegrationTest extends IntegrationTestBase {
         String accessToken = registerApiResponse.getData().accessToken();
         String refreshToken = registerApiResponse.getData().refreshToken();
 
-        LoginRequest loginRequest = new LoginRequest(email, password);
+        LoginRequest loginRequest = new LoginRequest(email, password, false);
 
         MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -62,13 +67,33 @@ class AuthControllerIntegrationTest extends IntegrationTestBase {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.accessToken").exists())
                 .andExpect(jsonPath("$.data.refreshToken").exists())
+                .andExpect(header().exists("Set-Cookie"))
                 .andReturn();
 
         String loginResponse = loginResult.getResponse().getContentAsString();
         ApiResponse<AuthResponse> loginApiResponse = objectMapper.readValue(loginResponse,
                 objectMapper.getTypeFactory().constructParametricType(ApiResponse.class, AuthResponse.class));
 
+        String loginAccessToken = loginApiResponse.getData().accessToken();
         String newRefreshToken = loginApiResponse.getData().refreshToken();
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + loginAccessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.email").value(email))
+                .andExpect(jsonPath("$.data.accessToken").doesNotExist());
+
+        // The access token must also be accepted from the HttpOnly cookie
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .cookie(new Cookie("access_token", loginAccessToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.email").value(email));
+
+        // A refresh token must not be accepted as an access token
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + newRefreshToken))
+                .andExpect(status().isUnauthorized());
 
         RefreshTokenRequest refreshRequest = new RefreshTokenRequest(newRefreshToken);
 
@@ -87,6 +112,13 @@ class AuthControllerIntegrationTest extends IntegrationTestBase {
 
         String latestRefreshToken = refreshApiResponse.getData().refreshToken();
 
+        // Token rotation must invalidate the refresh token used for the previous exchange
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RefreshTokenRequest(newRefreshToken))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+
         RefreshTokenRequest logoutRequest = new RefreshTokenRequest(latestRefreshToken);
 
         mockMvc.perform(post("/api/v1/auth/logout")
@@ -101,7 +133,26 @@ class AuthControllerIntegrationTest extends IntegrationTestBase {
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(invalidRefreshRequest)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void me_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void refresh_withInvalidToken_returns401() throws Exception {
+        RefreshTokenRequest request = new RefreshTokenRequest("not-a-valid-jwt");
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     @Test
@@ -143,7 +194,7 @@ class AuthControllerIntegrationTest extends IntegrationTestBase {
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isCreated());
 
-        LoginRequest loginRequest = new LoginRequest(email, "WrongPassword123");
+        LoginRequest loginRequest = new LoginRequest(email, "WrongPassword123", false);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -154,7 +205,7 @@ class AuthControllerIntegrationTest extends IntegrationTestBase {
 
     @Test
     void login_nonexistentUser_returns401() throws Exception {
-        LoginRequest loginRequest = new LoginRequest("nonexistent@example.com", "P@ssword123");
+        LoginRequest loginRequest = new LoginRequest("nonexistent@example.com", "P@ssword123", false);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

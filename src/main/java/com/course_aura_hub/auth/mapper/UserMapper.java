@@ -3,6 +3,7 @@ package com.course_aura_hub.auth.mapper;
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.OAuth2UserDto;
 import com.course_aura_hub.auth.dto.RegisterRequest;
+import com.course_aura_hub.auth.dto.UserResponse;
 import com.course_aura_hub.auth.model.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -40,4 +41,12 @@ public interface UserMapper {
     @Mapping(target = "tokenType", constant = "Bearer")
     @Mapping(target = "expiresIn", source = "expiresIn")
     AuthResponse toAuthResponse(User user, String accessToken, String refreshToken, long expiresIn);
+
+    @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "email", source = "user.email")
+    @Mapping(target = "firstName", source = "user.firstName")
+    @Mapping(target = "lastName", source = "user.lastName")
+    @Mapping(target = "role", expression = "java(user.getRole().name())")
+    @Mapping(target = "provider", expression = "java(user.getProvider().name())")
+    UserResponse toUserResponse(User user);
 }

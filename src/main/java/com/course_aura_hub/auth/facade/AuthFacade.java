@@ -4,6 +4,7 @@ import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
 import com.course_aura_hub.auth.dto.OAuth2UserDto;
 import com.course_aura_hub.auth.dto.RegisterRequest;
+import com.course_aura_hub.auth.dto.UserResponse;
 
 /**
  * Facade pattern interface providing a single, unified entry point for all authentication,
@@ -30,6 +31,11 @@ public interface AuthFacade {
      * Revokes all tokens for a user (logout).
      */
     void logout(String refreshToken);
+
+    /**
+     * Loads the profile of the currently authenticated user.
+     */
+    UserResponse getCurrentUser(String email);
 
     /**
      * Processes OAuth2 user data and issues JWT tokens.

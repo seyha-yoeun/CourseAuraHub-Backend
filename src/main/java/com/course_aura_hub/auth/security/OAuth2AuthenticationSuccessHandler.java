@@ -1,11 +1,9 @@
 package com.course_aura_hub.auth.security;
 
-import com.course_aura_hub.auth.config.CookieProperties;
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.OAuth2UserDto;
 import com.course_aura_hub.auth.service.OAuth2Service;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +23,7 @@ import java.io.IOException;
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final OAuth2Service oAuth2Service;
-    private final CookieProperties cookieProperties;
+    private final AuthCookieService authCookieService;
 
     @Value("${app.oauth2.redirect-uri:http://localhost:3000/oauth2/redirect}")
     private String redirectUri;
@@ -51,38 +49,11 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         OAuth2UserDto userDto = OAuth2UserDto.fromProvider(registrationId, oAuth2User.getAttributes());
         AuthResponse authResponse = oAuth2Service.processOAuth2PostLogin(userDto);
 
-        // Set access token cookie
-        Cookie accessTokenCookie = createCookie(
-                cookieProperties.accessTokenName(),
-                authResponse.accessToken(),
-                (int) cookieProperties.accessTokenMaxAge()
-        );
-        response.addCookie(accessTokenCookie);
-
-        // Set refresh token cookie
-        Cookie refreshTokenCookie = createCookie(
-                cookieProperties.refreshTokenName(),
-                authResponse.refreshToken(),
-                (int) cookieProperties.refreshTokenMaxAge()
-        );
-        response.addCookie(refreshTokenCookie);
+        // Set access and refresh token cookies for the browser flow
+        authCookieService.setAuthCookies(response, authResponse);
 
         // Clean redirect to frontend (no tokens in URL)
         clearAuthenticationAttributes(request);
         getRedirectStrategy().sendRedirect(request, response, redirectUri);
-    }
-
-    private Cookie createCookie(String name, String value, int maxAge) {
-        Cookie cookie = new Cookie(name, value);
-        cookie.setHttpOnly(cookieProperties.httpOnly());
-        cookie.setSecure(cookieProperties.secure());
-        cookie.setPath(cookieProperties.path());
-        cookie.setMaxAge(maxAge);
-        if (cookieProperties.domain() != null && !cookieProperties.domain().isBlank()) {
-            cookie.setDomain(cookieProperties.domain());
-        }
-        // SameSite attribute (requires Servlet API 3.1+ / Spring Boot 3+)
-        cookie.setAttribute("SameSite", cookieProperties.sameSite());
-        return cookie;
     }
 }

@@ -31,5 +31,6 @@ public abstract class IntegrationTestBase {
         registry.add("jwt.secret", () -> "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
         registry.add("jwt.access-token-expiration", () -> "900000");
         registry.add("jwt.refresh-token-expiration", () -> "604800000");
+        registry.add("app.rate-limit.enabled", () -> "false");
     }
 }

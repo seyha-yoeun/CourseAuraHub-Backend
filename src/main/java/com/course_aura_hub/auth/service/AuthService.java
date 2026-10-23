@@ -3,6 +3,7 @@ package com.course_aura_hub.auth.service;
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
 import com.course_aura_hub.auth.dto.RegisterRequest;
+import com.course_aura_hub.auth.dto.UserResponse;
 import com.course_aura_hub.auth.model.User;
 
 /**
@@ -31,6 +32,11 @@ public interface AuthService {
      * Revokes all tokens for a user (logout).
      */
     void logout(String refreshToken);
+
+    /**
+     * Loads the profile of the currently authenticated user.
+     */
+    UserResponse getCurrentUser(String email);
 
     /**
      * Builds standard AuthResponse with freshly minted JWT tokens for a given user.
