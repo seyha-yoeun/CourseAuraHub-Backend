@@ -85,6 +85,8 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/oauth2/**"
                         ).permitAll()
+                        // Learner self-service (my courses, profile, wishlist, progress, reviews)
+                        .requestMatchers("/api/v1/me", "/api/v1/me/**").authenticated()
                         // Client-safe platform branding
                         .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").authenticated()
                         // Admin-only management resources
@@ -112,6 +114,7 @@ public class SecurityConfig {
                         ).permitAll()
                         // Default error controller
                         .requestMatchers("/error").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )

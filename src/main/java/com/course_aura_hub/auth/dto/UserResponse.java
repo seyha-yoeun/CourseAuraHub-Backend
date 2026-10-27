@@ -23,6 +23,9 @@ public record UserResponse(
         String role,
 
         @Schema(description = "User authentication provider", example = "LOCAL")
-        String provider
+        String provider,
+
+        @Schema(description = "Profile avatar URL, if set", example = "https://example.com/avatar.png")
+        String imageUrl
 ) {
 }

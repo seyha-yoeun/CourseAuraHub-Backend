@@ -24,6 +24,10 @@ public class CourseAssembler {
     private final StudentAssembler studentAssembler;
 
     public CourseResponse toResponse(Course course, List<Student> enrolledStudents) {
+        return toResponse(course, enrolledStudents, null);
+    }
+
+    public CourseResponse toResponse(Course course, List<Student> enrolledStudents, Boolean enrolled) {
         Map<Short, CourseMonthlyMetric> metricsByMonth = new LinkedHashMap<>();
         for (CourseMonthlyMetric metric : course.getMonthlyMetrics()) {
             metricsByMonth.put(metric.getMonth(), metric);
@@ -64,7 +68,8 @@ public class CourseAssembler {
                 course.getUpdatedAt(),
                 List.copyOf(monthlyEnrollments),
                 List.copyOf(monthlyRevenue),
-                enrolledStudentList
+                enrolledStudentList,
+                enrolled
         );
     }
 }
