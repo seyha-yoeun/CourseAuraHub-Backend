@@ -11,7 +11,11 @@ public interface CourseService {
 
     List<CourseResponse> findAll(CourseSearchCriteria criteria, boolean includeUnpublished);
 
-    CourseResponse findBySlug(String slug, boolean includeUnpublished);
+    /**
+     * @param admin       admins see unpublished courses and the enrolled-student list
+     * @param viewerEmail the caller, used to report whether they are enrolled
+     */
+    CourseResponse findBySlug(String slug, boolean admin, String viewerEmail);
 
     CourseResponse create(CourseCreateRequest request);
 

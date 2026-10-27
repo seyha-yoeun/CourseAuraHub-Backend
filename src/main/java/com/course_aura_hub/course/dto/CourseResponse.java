@@ -29,6 +29,8 @@ public record CourseResponse(
         LocalDate updatedAt,
         List<Integer> monthlyEnrollments,
         List<BigDecimal> monthlyRevenue,
-        List<StudentResponse> enrolledStudentList
+        List<StudentResponse> enrolledStudentList,
+        // Whether the caller is enrolled; null on list responses
+        Boolean enrolled
 ) {
 }

@@ -39,6 +39,12 @@ public interface AuthService {
     UserResponse getCurrentUser(String email);
 
     /**
+     * Changes a local account's password after verifying the current one, then issues a fresh
+     * token pair so every previously issued refresh token stops working.
+     */
+    AuthResponse changePassword(String email, String currentPassword, String newPassword);
+
+    /**
      * Builds standard AuthResponse with freshly minted JWT tokens for a given user.
      */
     AuthResponse createAuthResponse(User user);

@@ -13,6 +13,7 @@ import com.course_aura_hub.auth.mapper.UserMapper;
 import com.course_aura_hub.auth.model.User;
 import com.course_aura_hub.auth.repository.UserRepository;
 import com.course_aura_hub.auth.security.JwtTokenProvider;
+import com.course_aura_hub.common.exception.BusinessRuleException;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -170,6 +171,32 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email.trim().toLowerCase())
                 .orElseThrow(() -> new InvalidTokenException("User not found"));
         return userMapper.toUserResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email.trim().toLowerCase())
+                .orElseThrow(() -> new InvalidTokenException("User not found"));
+
+        if (!StringUtils.hasText(user.getPassword())) {
+            throw new BusinessRuleException(
+                    "Account was created using " + user.getProvider() + " and has no password to change"
+            );
+        }
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            log.warn("Rejected password change with wrong current password for user: {}", user.getEmail());
+            throw new BusinessRuleException("Current password is incorrect");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BusinessRuleException("New password must be different from the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        log.info("Changed password for user: {}", user.getEmail());
+
+        // Rotating the stored refresh token hash revokes every other session
+        return createAuthResponse(user);
     }
 
     @Override
