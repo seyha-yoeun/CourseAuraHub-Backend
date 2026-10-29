@@ -8,10 +8,8 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.UnsupportedJwtException;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SecurityException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +17,6 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
@@ -29,46 +26,45 @@ import java.util.function.Function;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtTokenProvider {
 
-    private final JwtProperties jwtProperties;
+    public static final String CLAIM_TOKEN_TYPE = "tokenType";
+    public static final String CLAIM_TOKEN_VERSION = "tokenVersion";
+    /** Session (refresh family) id; lets a single logout revoke the access tokens of that device. */
+    public static final String CLAIM_SESSION_ID = "sid";
+    public static final String ACCESS_TOKEN_TYPE = "ACCESS";
+    public static final String REFRESH_TOKEN_TYPE = "REFRESH";
 
-    private SecretKey getSigningKey() {
-        byte[] keyBytes;
-        try {
-            keyBytes = Decoders.BASE64.decode(jwtProperties.secret());
-        } catch (Exception e) {
-            keyBytes = jwtProperties.secret().getBytes(StandardCharsets.UTF_8);
-        }
-        if (keyBytes.length < 32) {
-            keyBytes = Arrays.copyOf(keyBytes, 32);
-        }
-        return Keys.hmacShaKeyFor(keyBytes);
+    private final JwtProperties jwtProperties;
+    private final SecretKey signingKey;
+
+    public JwtTokenProvider(JwtProperties jwtProperties) {
+        this.jwtProperties = jwtProperties;
+        // JwtProperties has already rejected missing, short and known-public secrets
+        this.signingKey = Keys.hmacShaKeyFor(jwtProperties.signingKeyBytes());
     }
 
-    public String generateAccessToken(User user) {
+    public String generateAccessToken(User user, UUID sessionId) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("userId", user.getId().toString());
         extraClaims.put("role", user.getRole().name());
         extraClaims.put("firstName", user.getFirstName());
         extraClaims.put("lastName", user.getLastName());
         extraClaims.put("provider", user.getProvider().name());
-        extraClaims.put("tokenType", "ACCESS");
+        extraClaims.put(CLAIM_TOKEN_TYPE, ACCESS_TOKEN_TYPE);
+        extraClaims.put(CLAIM_TOKEN_VERSION, user.getTokenVersion());
+        extraClaims.put(CLAIM_SESSION_ID, sessionId.toString());
 
         return buildToken(extraClaims, user.getEmail(), jwtProperties.accessTokenExpiration());
     }
 
-    public String generateRefreshToken(User user) {
-        return generateRefreshToken(user, jwtProperties.refreshTokenExpiration());
-    }
-
-    public String generateRefreshToken(User user, long customExpiration) {
+    public String generateRefreshToken(User user, UUID sessionId, long expirationMillis) {
         Map<String, Object> extraClaims = new HashMap<>();
         extraClaims.put("userId", user.getId().toString());
-        extraClaims.put("tokenType", "REFRESH");
+        extraClaims.put(CLAIM_TOKEN_TYPE, REFRESH_TOKEN_TYPE);
+        extraClaims.put(CLAIM_SESSION_ID, sessionId.toString());
 
-        return buildToken(extraClaims, user.getEmail(), customExpiration);
+        return buildToken(extraClaims, user.getEmail(), expirationMillis);
     }
 
     private String buildToken(Map<String, Object> extraClaims, String subject, long expiration) {
@@ -81,7 +77,7 @@ public class JwtTokenProvider {
                 .subject(subject)
                 .issuedAt(now)
                 .expiration(expiryDate)
-                .signWith(getSigningKey())
+                .signWith(signingKey)
                 .compact();
     }
 
@@ -97,36 +93,34 @@ public class JwtTokenProvider {
     public Claims extractAllClaims(String token) {
         try {
             return Jwts.parser()
-                    .verifyWith(getSigningKey())
+                    .verifyWith(signingKey)
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (ExpiredJwtException ex) {
-            log.warn("JWT token expired: {}", ex.getMessage());
+            log.debug("JWT token expired");
             throw new TokenExpiredException("JWT token has expired");
         } catch (SecurityException | MalformedJwtException ex) {
-            log.error("Invalid JWT signature/format: {}", ex.getMessage());
+            log.warn("Invalid JWT signature/format");
             throw new IllegalArgumentException("Invalid JWT token");
         } catch (UnsupportedJwtException ex) {
-            log.error("Unsupported JWT: {}", ex.getMessage());
+            log.warn("Unsupported JWT");
             throw new IllegalArgumentException("Unsupported JWT token");
         } catch (IllegalArgumentException ex) {
-            log.error("JWT claims string is empty: {}", ex.getMessage());
+            log.warn("JWT claims string is empty");
             throw new IllegalArgumentException("JWT claims string is empty");
         }
     }
 
-    public boolean validateToken(String token, String username) {
-        final String extractedUser = extractUsername(token);
-        return (extractedUser.equalsIgnoreCase(username) && !isTokenExpired(token));
-    }
-
-    public boolean isTokenExpired(String token) {
+    public static UUID sessionIdOf(Claims claims) {
+        Object raw = claims.get(CLAIM_SESSION_ID);
+        if (raw == null) {
+            return null;
+        }
         try {
-            Date expiration = extractClaim(token, Claims::getExpiration);
-            return expiration.before(new Date());
-        } catch (TokenExpiredException e) {
-            return true;
+            return UUID.fromString(raw.toString());
+        } catch (IllegalArgumentException ex) {
+            return null;
         }
     }
 
@@ -138,6 +132,7 @@ public class JwtTokenProvider {
         return jwtProperties.refreshTokenExpiration();
     }
 
+    /** Refresh tokens are long random JWTs, so an unkeyed SHA-256 is sufficient (and matches stored legacy hashes). */
     public String hashRefreshToken(String refreshToken) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

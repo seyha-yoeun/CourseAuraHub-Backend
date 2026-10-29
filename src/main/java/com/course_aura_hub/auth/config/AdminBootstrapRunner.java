@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 
@@ -53,6 +54,9 @@ public class AdminBootstrapRunner implements ApplicationRunner {
                     .role(Role.ROLE_ADMIN)
                     .provider(AuthProvider.LOCAL)
                     .enabled(true)
+                    // Configured by the operator, so there is no mailbox to verify
+                    .emailVerified(true)
+                    .emailVerifiedAt(Instant.now())
                     .build();
             log.info("Created bootstrap admin account email={}", email);
             return userRepository.save(created);

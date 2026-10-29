@@ -1,232 +1,172 @@
 package com.course_aura_hub.auth.service;
 
-import com.course_aura_hub.auth.config.JwtProperties;
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
-import com.course_aura_hub.auth.dto.RegisterRequest;
 import com.course_aura_hub.auth.dto.UserResponse;
+import com.course_aura_hub.auth.exception.AccountDisabledException;
+import com.course_aura_hub.auth.exception.AccountLockedException;
+import com.course_aura_hub.auth.exception.AuthException;
+import com.course_aura_hub.auth.exception.EmailNotVerifiedException;
 import com.course_aura_hub.auth.exception.InvalidCredentialsException;
 import com.course_aura_hub.auth.exception.InvalidTokenException;
-import com.course_aura_hub.auth.exception.TokenExpiredException;
-import com.course_aura_hub.auth.exception.UserAlreadyExistsException;
 import com.course_aura_hub.auth.mapper.UserMapper;
+import com.course_aura_hub.auth.model.AuditEventType;
+import com.course_aura_hub.auth.model.AuditOutcome;
+import com.course_aura_hub.auth.model.SessionRevocationReason;
 import com.course_aura_hub.auth.model.User;
 import com.course_aura_hub.auth.repository.UserRepository;
-import com.course_aura_hub.auth.security.JwtTokenProvider;
-import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
+    private static final String INVALID_CREDENTIALS = "Invalid email or password";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final AuthenticationManager authenticationManager;
     private final UserMapper userMapper;
-    private final JwtProperties jwtProperties;
+    private final LoginAttemptService loginAttemptService;
+    private final RefreshSessionService refreshSessionService;
+    private final MfaService mfaService;
+    private final AuthAuditService auditService;
 
-    private static final long REMEMBER_ME_REFRESH_TOKEN_EXPIRATION = 30L * 24 * 60 * 60 * 1000; // 30 days in milliseconds
-
-    @Override
-    @Transactional
-    public AuthResponse register(RegisterRequest request) {
-        String normalizedEmail = request.email().trim().toLowerCase();
-
-        if (userRepository.existsByEmail(normalizedEmail)) {
-            throw new UserAlreadyExistsException("An account with email " + request.email() + " already exists");
-        }
-
-        // Map DTO to User entity via MapStruct
-        User user = userMapper.toEntity(request);
-        user.setEmail(normalizedEmail);
-        user.setPassword(passwordEncoder.encode(request.password()));
-
-        User savedUser = userRepository.save(user);
-        log.info("Successfully registered local user with email: {}", savedUser.getEmail());
-
-        return createAuthResponse(savedUser);
-    }
+    // Compared against when the account is unknown or has no password, so response time doesn't reveal which
+    private volatile String timingEqualizationHash;
 
     @Override
-    @Transactional
-    public AuthResponse login(LoginRequest request) {
-        String normalizedEmail = request.email().trim().toLowerCase();
+    // Failed attempts and lockouts are written before the rejection is thrown; they must commit
+    @Transactional(noRollbackFor = {InvalidCredentialsException.class, AccountLockedException.class})
+    public LoginOutcome login(LoginRequest request) {
+        String normalizedEmail = request.email().trim().toLowerCase(Locale.ROOT);
+        Instant now = Instant.now();
 
-        User user = userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
-
-        if (user.getPassword() == null || user.getPassword().isBlank()) {
-            throw new InvalidCredentialsException(
-                    "Account was created using " + user.getProvider() + ". Please sign in with OAuth provider."
-            );
+        Optional<User> found = userRepository.findByEmailForUpdate(normalizedEmail);
+        if (found.isEmpty()) {
+            passwordEncoder.matches(request.password(), timingEqualizationHash());
+            auditService.record(AuthAuditEntry.builder()
+                    .type(AuditEventType.LOGIN)
+                    .outcome(AuditOutcome.FAILURE)
+                    .email(normalizedEmail)
+                    .reason("UNKNOWN_ACCOUNT")
+                    .build());
+            throw new InvalidCredentialsException(INVALID_CREDENTIALS);
         }
 
-        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
-            long minutesRemaining = Duration.between(Instant.now(), user.getLockedUntil()).toMinutes() + 1;
-            throw new InvalidCredentialsException("Account is temporarily locked. Try again in " + minutesRemaining + " minutes.");
+        User user = found.get();
+        if (user.isLockedAt(now)) {
+            auditService.record(AuthAuditEntry.failure(AuditEventType.LOGIN, user, "ACCOUNT_LOCKED").build());
+            throw new AccountLockedException();
         }
 
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(normalizedEmail, request.password())
-            );
-        } catch (BadCredentialsException ex) {
-            handleFailedLogin(user);
+        if (!passwordMatches(request.password(), user)) {
+            boolean lockedNow = loginAttemptService.recordFailure(user, now);
+            auditService.record(AuthAuditEntry.failure(AuditEventType.LOGIN, user, "BAD_CREDENTIALS").build());
             log.warn("Invalid password attempt for email: {}", normalizedEmail);
-            throw new InvalidCredentialsException("Invalid email or password");
+            if (lockedNow) {
+                throw new AccountLockedException();
+            }
+            throw new InvalidCredentialsException(INVALID_CREDENTIALS);
         }
+        loginAttemptService.recordSuccess(user);
 
-        handleSuccessfulLogin(user);
-        log.info("Successfully authenticated user: {}", normalizedEmail);
-        return createAuthResponse(user, request.rememberMe());
-    }
-
-    private void handleFailedLogin(User user) {
-        int attempts = user.getFailedLoginAttempts() + 1;
-        user.setFailedLoginAttempts(attempts);
-
-        if (attempts >= 5) {
-            user.setLockedUntil(Instant.now().plus(15, ChronoUnit.MINUTES));
-            log.warn("Account locked for 15 minutes due to failed login attempts: {}", user.getEmail());
-        }
-
-        userRepository.save(user);
-    }
-
-    private void handleSuccessfulLogin(User user) {
-        if (user.getFailedLoginAttempts() > 0 || user.getLockedUntil() != null) {
-            user.setFailedLoginAttempts(0);
-            user.setLockedUntil(null);
-            userRepository.save(user);
-        }
-    }
-
-    @Override
-    @Transactional
-    public AuthResponse refreshToken(String refreshToken) {
-        if (!StringUtils.hasText(refreshToken)) {
-            throw new InvalidTokenException("Refresh token is required");
-        }
-
-        Claims claims;
-        try {
-            claims = jwtTokenProvider.extractAllClaims(refreshToken);
-        } catch (TokenExpiredException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            log.warn("Rejected malformed refresh token: {}", ex.getMessage());
-            throw new InvalidTokenException("Invalid refresh token");
-        }
-
-        String tokenType = claims.get("tokenType", String.class);
-        if (!"REFRESH".equalsIgnoreCase(tokenType)) {
-            throw new InvalidTokenException("Provided token is not a valid refresh token");
-        }
-
-        String email = claims.getSubject();
-        if (!StringUtils.hasText(email)) {
-            throw new InvalidTokenException("Invalid refresh token");
-        }
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new InvalidTokenException("Invalid refresh token"));
-
+        // Status is revealed only to callers who proved the password
         if (!user.isEnabled()) {
-            throw new InvalidTokenException("User account is disabled");
+            auditService.record(AuthAuditEntry.failure(AuditEventType.LOGIN, user, "ACCOUNT_DISABLED").build());
+            throw new AccountDisabledException();
+        }
+        if (user.isPendingEmailVerification()) {
+            auditService.record(AuthAuditEntry.failure(AuditEventType.LOGIN, user, "EMAIL_NOT_VERIFIED").build());
+            throw new EmailNotVerifiedException();
         }
 
-        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
-            throw new InvalidTokenException("User account is temporarily locked");
+        if (user.isMfaEnabled()) {
+            auditService.record(AuthAuditEntry.success(AuditEventType.LOGIN, user).reason("MFA_CHALLENGE_ISSUED").build());
+            return new LoginOutcome.MfaRequired(mfaService.createLoginChallenge(user, request.rememberMe()));
         }
 
-        String storedRefreshToken = user.getRefreshToken();
-        if (storedRefreshToken == null || !jwtTokenProvider.matchesRefreshToken(refreshToken, storedRefreshToken)) {
-            log.warn("Refresh token mismatch for user: {}", email);
-            throw new InvalidTokenException("Invalid refresh token");
-        }
-
-        // Token rotation: invalidate old refresh token and issue new pair
-        return createAuthResponse(user);
+        AuthResponse auth = refreshSessionService.startSession(user, request.rememberMe());
+        log.info("Successfully authenticated user: {}", normalizedEmail);
+        auditService.record(AuthAuditEntry.success(AuditEventType.LOGIN, user)
+                .sessionId(auth.sessionId())
+                .metadata(Map.of("method", "PASSWORD"))
+                .build());
+        return new LoginOutcome.Authenticated(auth);
     }
 
     @Override
     @Transactional(readOnly = true)
     public UserResponse getCurrentUser(String email) {
-        User user = userRepository.findByEmail(email.trim().toLowerCase())
+        User user = userRepository.findByEmail(email.trim().toLowerCase(Locale.ROOT))
                 .orElseThrow(() -> new InvalidTokenException("User not found"));
         return userMapper.toUserResponse(user);
     }
 
     @Override
     @Transactional
-    public AuthResponse createAuthResponse(User user) {
-        return createAuthResponse(user, false);
-    }
+    public AuthResponse changePassword(UUID userId, String currentPassword, String newPassword) {
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new InvalidTokenException("User not found"));
 
-    @Transactional
-    public AuthResponse createAuthResponse(User user, boolean rememberMe) {
-        String accessToken = jwtTokenProvider.generateAccessToken(user);
-        long refreshExpiration = rememberMe ? REMEMBER_ME_REFRESH_TOKEN_EXPIRATION : jwtProperties.refreshTokenExpiration();
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user, refreshExpiration);
-        long expiresIn = jwtTokenProvider.getAccessTokenExpiration();
+        if (!StringUtils.hasText(user.getPassword())) {
+            throw new AuthException("This account has no password yet. Use 'Forgot password' to set one.");
+        }
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            auditService.record(AuthAuditEntry.failure(AuditEventType.PASSWORD_CHANGED, user, "WRONG_CURRENT_PASSWORD").build());
+            throw new AuthException("Current password is incorrect");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new AuthException("New password must be different from the current password");
+        }
 
-        user.setRefreshToken(jwtTokenProvider.hashRefreshToken(refreshToken));
-        user.setTokensIssuedAt(Instant.now());
-        user.setRefreshTokenExpiresAt(
-                Instant.now().plusMillis(refreshExpiration)
-        );
-
+        user.setPassword(passwordEncoder.encode(newPassword));
+        // Revoke every other device: refresh sessions and any access token still in flight
+        user.setTokenVersion(user.getTokenVersion() + 1);
         userRepository.save(user);
+        refreshSessionService.revokeAllSessions(user.getId(), SessionRevocationReason.PASSWORD_CHANGED);
+        log.info("Changed password for user: {}", user.getEmail());
+        auditService.record(AuthAuditEntry.success(AuditEventType.PASSWORD_CHANGED, user).build());
 
-        return userMapper.toAuthResponse(
-                user,
-                accessToken,
-                refreshToken,
-                expiresIn
-        );
+        return refreshSessionService.startSession(user, false);
     }
 
     @Override
     @Transactional
-    public void logout(String refreshToken) {
-        if (refreshToken == null || refreshToken.isBlank()) {
-            return;
-        }
+    public void logoutAll(UUID userId) {
+        userRepository.findByIdForUpdate(userId).ifPresent(user -> {
+            user.setTokenVersion(user.getTokenVersion() + 1);
+            userRepository.save(user);
+        });
+        refreshSessionService.revokeAllSessions(userId, SessionRevocationReason.LOGOUT_ALL);
+    }
 
-        try {
-            Claims claims = jwtTokenProvider.extractAllClaims(refreshToken);
-            String tokenType = claims.get("tokenType", String.class);
-            if (!"REFRESH".equalsIgnoreCase(tokenType)) {
-                return;
-            }
-
-            String email = claims.getSubject();
-            User user = userRepository.findByEmail(email).orElse(null);
-            if (user != null) {
-                user.setAccessToken(null);
-                user.setRefreshToken(null);
-                user.setRefreshTokenExpiresAt(null);
-                user.setTokensIssuedAt(null);
-                userRepository.save(user);
-                log.info("Successfully revoked tokens for user: {}", email);
-            }
-        } catch (Exception ex) {
-            log.debug("Logout with invalid token: {}", ex.getMessage());
+    private boolean passwordMatches(String rawPassword, User user) {
+        if (!StringUtils.hasText(user.getPassword())) {
+            // OAuth-only account: do the same work, then fail with the generic message
+            passwordEncoder.matches(rawPassword, timingEqualizationHash());
+            return false;
         }
+        return passwordEncoder.matches(rawPassword, user.getPassword());
+    }
+
+    private String timingEqualizationHash() {
+        String hash = timingEqualizationHash;
+        if (hash == null) {
+            hash = passwordEncoder.encode(UUID.randomUUID().toString());
+            timingEqualizationHash = hash;
+        }
+        return hash;
     }
 }
