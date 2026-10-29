@@ -37,5 +37,11 @@ public record AuthResponse(
         String role,
 
         @Schema(description = "User authentication provider", example = "LOCAL")
-        String provider
+        String provider,
+
+        @Schema(description = "Session (device) identifier; stable across refresh-token rotation")
+        UUID sessionId,
+
+        @Schema(description = "Refresh token lifespan in milliseconds", example = "604800000")
+        long refreshExpiresIn
 ) {}

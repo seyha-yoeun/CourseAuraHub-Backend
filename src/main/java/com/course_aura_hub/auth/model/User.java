@@ -90,6 +90,34 @@ public class User {
     @Column(name = "tokens_issued_at")
     private Instant tokensIssuedAt;
 
+    // Embedded in every access token; bumping it revokes all access tokens issued before
+    @Column(name = "token_version", nullable = false)
+    @Builder.Default
+    private int tokenVersion = 0;
+
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private boolean emailVerified = false;
+
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "mfa_enabled", nullable = false)
+    @Builder.Default
+    private boolean mfaEnabled = false;
+
+    /**
+     * A local registration that has not confirmed its email yet. OAuth2-created accounts are proven
+     * through the provider identity instead, so they are never pending.
+     */
+    public boolean isPendingEmailVerification() {
+        return !emailVerified && provider == AuthProvider.LOCAL;
+    }
+
+    public boolean isLockedAt(Instant now) {
+        return lockedUntil != null && lockedUntil.isAfter(now);
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = Instant.now();
