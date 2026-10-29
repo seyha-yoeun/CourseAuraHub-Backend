@@ -61,6 +61,15 @@ public class User {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    @Column(name = "bio", columnDefinition = "TEXT")
+    private String bio;
+
+    @Column(name = "website", length = 500)
+    private String website;
+
+    @Column(name = "twitter", length = 100)
+    private String twitter;
+
     @Column(name = "enabled", nullable = false)
     @Builder.Default
     private boolean enabled = true;

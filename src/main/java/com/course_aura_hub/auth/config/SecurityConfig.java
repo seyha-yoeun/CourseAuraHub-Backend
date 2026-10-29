@@ -15,6 +15,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -98,6 +99,25 @@ public class SecurityConfig {
                         ).permitAll()
                         // Account administration
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        // Client-safe platform branding
+                        .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").authenticated()
+                        // Admin-only management resources
+                        .requestMatchers(
+                                "/api/v1/students",
+                                "/api/v1/students/**",
+                                "/api/v1/stats",
+                                "/api/v1/stats/**",
+                                "/api/v1/enrollments",
+                                "/api/v1/enrollments/**",
+                                "/api/v1/settings",
+                                "/api/v1/settings/**"
+                        ).hasRole("ADMIN")
+                        // Course writes are admin-only, reads are available to all authenticated users
+                        .requestMatchers(HttpMethod.POST, "/api/v1/courses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/courses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/courses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/courses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/courses/**").authenticated()
                         // Swagger & OpenAPI documentation
                         .requestMatchers(
                                 "/v3/api-docs/**",
