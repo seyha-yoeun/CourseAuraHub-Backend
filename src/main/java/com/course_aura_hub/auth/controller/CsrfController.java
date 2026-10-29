@@ -18,7 +18,8 @@ public class CsrfController {
     @GetMapping("/csrf")
     @Operation(
             summary = "Get CSRF token",
-            description = "Returns the expected header, parameter, and token values. Also sets the XSRF-TOKEN cookie."
+            description = "Returns the expected header, parameter, and token values. Also sets the XSRF-TOKEN cookie. "
+                    + "Required for state-changing requests authenticated by cookies."
     )
     public ResponseEntity<ApiResponse<CsrfTokenResponse>> csrf(CsrfToken csrfToken) {
         CsrfTokenResponse response = new CsrfTokenResponse(
