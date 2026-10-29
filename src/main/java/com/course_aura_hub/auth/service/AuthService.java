@@ -2,36 +2,20 @@ package com.course_aura_hub.auth.service;
 
 import com.course_aura_hub.auth.dto.AuthResponse;
 import com.course_aura_hub.auth.dto.LoginRequest;
-import com.course_aura_hub.auth.dto.RegisterRequest;
 import com.course_aura_hub.auth.dto.UserResponse;
-import com.course_aura_hub.auth.model.User;
+
+import java.util.UUID;
 
 /**
- * Service contract defining operations for local registration, authentication,
- * and JWT token lifecycle management.
+ * Service contract for password authentication and account credentials.
+ * Registration lives in {@link RegistrationService}; token lifecycle in {@link RefreshSessionService}.
  */
 public interface AuthService {
 
     /**
-     * Registers a new local user with encrypted password.
+     * Checks email and password. Returns tokens, or a 2FA challenge when the account requires one.
      */
-    AuthResponse register(RegisterRequest request);
-
-    /**
-     * Authenticates an existing user and returns JWT token pair.
-     */
-    AuthResponse login(LoginRequest request);
-
-    /**
-     * Generates a fresh access and refresh token pair using an existing valid refresh token.
-     * Implements token rotation: the old refresh token is invalidated.
-     */
-    AuthResponse refreshToken(String refreshToken);
-
-    /**
-     * Revokes all tokens for a user (logout).
-     */
-    void logout(String refreshToken);
+    LoginOutcome login(LoginRequest request);
 
     /**
      * Loads the profile of the currently authenticated user.
@@ -39,12 +23,13 @@ public interface AuthService {
     UserResponse getCurrentUser(String email);
 
     /**
-     * Builds standard AuthResponse with freshly minted JWT tokens for a given user.
+     * Changes the password after verifying the current one, signs out every session (including
+     * outstanding access tokens) and returns a fresh session for the caller.
      */
-    AuthResponse createAuthResponse(User user);
+    AuthResponse changePassword(UUID userId, String currentPassword, String newPassword);
 
     /**
-     * Builds AuthResponse with optional remember-me extended refresh token expiry.
+     * Signs out every session and revokes access tokens still within their lifetime.
      */
-    AuthResponse createAuthResponse(User user, boolean rememberMe);
+    void logoutAll(UUID userId);
 }

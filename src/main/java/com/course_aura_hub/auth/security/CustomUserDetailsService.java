@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Collections;
 
 @Service
@@ -21,19 +22,21 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email.trim().toLowerCase()).orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+        User user = userRepository.findByEmail(email.trim().toLowerCase()).orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         // In case OAuth user hasn't set password, pass empty string
         String password = user.getPassword() != null ? user.getPassword() : "";
 
-        return new org.springframework.security.core.userdetails.User(
+        return new AuthUserPrincipal(
+                user.getId(),
                 user.getEmail(),
                 password,
-                user.isEnabled(),
-                true,
-                true,
-                true,
-                Collections.singletonList(new SimpleGrantedAuthority(user.getRole().name()))
+                // Pending local registrations are treated as disabled everywhere a principal is checked
+                user.isEnabled() && !user.isPendingEmailVerification(),
+                !user.isLockedAt(Instant.now()),
+                Collections.singletonList(new SimpleGrantedAuthority(user.getRole().name())),
+                user.getTokenVersion(),
+                null
         );
     }
 }
