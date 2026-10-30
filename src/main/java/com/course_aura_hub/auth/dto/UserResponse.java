@@ -29,6 +29,9 @@ public record UserResponse(
         boolean emailVerified,
 
         @Schema(description = "Whether two-factor authentication is enabled", example = "false")
-        boolean mfaEnabled
+        boolean mfaEnabled,
+
+        @Schema(description = "Profile avatar URL, if set", example = "https://example.com/avatar.png")
+        String imageUrl
 ) {
 }
