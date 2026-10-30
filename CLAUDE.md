@@ -31,7 +31,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `settings` | Platform settings (single row) | `/api/v1/settings` |
 | `learner` | Self-service: my courses, self-enroll, dashboard, achievements, profile, password, wishlist | `/api/v1/me` |
 | `certificate` | Completion certificates, public verification | `/api/v1/me/certificates`, `/api/v1/certificates/{number}` (public) |
-| `curriculum` | Sections, lessons, lesson progress | `/api/v1/courses/{slug}/curriculum`, `/api/v1/me/lessons` |
+| `curriculum` | Sections, lessons, lesson progress, video resume | `/api/v1/courses/{slug}/curriculum`, `/api/v1/me/lessons` |
 | `order` | Checkout, order history, refunds, `PaymentGateway` port | `/api/v1/me/orders`, `/api/v1/admin/orders`, `/api/v1/payments/webhooks/{provider}` |
 | `coupon` | Discount codes; redemptions are derived from orders | `/api/v1/me/coupons/preview`, `/api/v1/admin/coupons` |
 | `review` | Course reviews and ratings | `/api/v1/courses/{slug}/reviews`, `/api/v1/me/courses/{slug}/review` |

@@ -9,6 +9,8 @@ public record NextLessonResponse(
         String type,
         Integer durationMinutes,
         Integer sectionId,
-        String sectionTitle
+        String sectionTitle,
+        @Schema(description = "Where the learner stopped in this video; null if nothing is saved")
+        Integer resumePositionSeconds
 ) {
 }
