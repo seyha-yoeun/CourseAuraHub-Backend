@@ -11,8 +11,15 @@ import java.util.List;
 
 public interface OrderService {
 
-    /** Reuses the learner's open order for the course when its price still matches, else opens a new one. */
-    Order openOrder(String email, String courseSlug, String currency, String provider);
+    /**
+     * Reuses the learner's open order for the course when its price and coupon still match, else opens a new one.
+     *
+     * @param provider active gateway, or null when none is configured
+     */
+    Order openOrder(String email, String courseSlug, String couponCode, String currency, String provider);
+
+    /** Settles an order that a coupon reduced to zero, which no provider needs to see. */
+    OrderResponse completeFreeOrder(String orderNumber);
 
     OrderResponse attachSession(String orderNumber, PaymentSession session);
 

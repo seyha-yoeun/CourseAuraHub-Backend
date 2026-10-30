@@ -20,6 +20,18 @@ class CheckoutDisabledIntegrationTest extends LearnerIntegrationTestSupport {
     }
 
     @Test
+    void fullDiscountStillWorksWithoutProvider() throws Exception {
+        String code = "FREE-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        mockMvc.perform(asJson(registerAdmin(), post("/api/v1/admin/coupons"),
+                        java.util.Map.of("code", code, "discountType", "PERCENT", "discountValue", 100)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(asJson(registerUser(), post("/api/v1/me/orders"),
+                        java.util.Map.of("courseSlug", PAID_COURSE, "couponCode", code)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void webhookFindsNoProvider() throws Exception {
         mockMvc.perform(post("/api/v1/payments/webhooks/fake").contentType(MediaType.TEXT_PLAIN).content("x"))
                 .andExpect(status().isNotFound());
