@@ -3,6 +3,9 @@ package com.course_aura_hub.order.service;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.DuplicateResourceException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
+import com.course_aura_hub.common.exception.ServiceUnavailableException;
+import com.course_aura_hub.coupon.service.CouponQuote;
+import com.course_aura_hub.coupon.service.CouponService;
 import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.course.model.CourseStatus;
 import com.course_aura_hub.course.repository.CourseRepository;
@@ -35,6 +38,7 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 @Slf4j
@@ -51,10 +55,11 @@ public class OrderServiceImpl implements OrderService {
     private final EnrollmentRepository enrollmentRepository;
     private final EnrollmentService enrollmentService;
     private final LearnerAccountService learnerAccountService;
+    private final CouponService couponService;
 
     @Override
     @Transactional
-    public Order openOrder(String email, String courseSlug, String currency, String provider) {
+    public Order openOrder(String email, String courseSlug, String couponCode, String currency, String provider) {
         // Locking the learner serializes parallel checkouts; the partial unique index is the backstop
         Integer studentId = learnerAccountService.currentStudent(email).getId();
         Student student = studentRepository.findByIdForUpdate(studentId)
@@ -73,9 +78,20 @@ public class OrderServiceImpl implements OrderService {
 
         Optional<Order> open = orderRepository
                 .findByStudentIdAndCourseIdAndStatus(student.getId(), course.getId(), OrderStatus.PENDING);
+        CouponQuote quote = couponService.applyToOrder(
+                couponCode, course, student.getId(), open.map(Order::getId).orElse(null));
+        if (quote.finalAmount().signum() > 0 && provider == null) {
+            throw new ServiceUnavailableException("Paid checkout is not available yet");
+        }
+
         if (open.isPresent()) {
             Order order = open.get();
-            if (order.getAmount().compareTo(course.getPrice()) == 0 && order.getCurrency().equals(currency)) {
+            boolean sameCoupon = Objects.equals(
+                    order.getCoupon() == null ? null : order.getCoupon().getId(),
+                    quote.coupon() == null ? null : quote.coupon().getId());
+            if (sameCoupon
+                    && order.getAmount().compareTo(quote.finalAmount()) == 0
+                    && order.getCurrency().equals(currency)) {
                 return order;
             }
             order.setStatus(OrderStatus.CANCELLED);
@@ -87,12 +103,28 @@ public class OrderServiceImpl implements OrderService {
                 .orderNumber(OrderNumberGenerator.next())
                 .student(student)
                 .course(course)
-                .amount(course.getPrice())
+                .coupon(quote.coupon())
+                .listAmount(quote.listAmount())
+                .discountAmount(quote.discountAmount())
+                .amount(quote.finalAmount())
                 .currency(currency)
                 .status(OrderStatus.PENDING)
                 .provider(provider)
                 .build();
         return orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse completeFreeOrder(String orderNumber) {
+        Order order = lock(orderNumber);
+        if (order.getAmount().signum() != 0) {
+            throw new BusinessRuleException("This order requires payment");
+        }
+        if (order.getStatus() == OrderStatus.PENDING) {
+            settle(order);
+        }
+        return toResponse(order);
     }
 
     @Override
@@ -173,6 +205,10 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Money was taken, so a late payment on a cancelled or failed order still counts
+        settle(order);
+    }
+
+    private void settle(Order order) {
         order.setStatus(OrderStatus.PAID);
         order.setPaidAt(Instant.now());
         order.setCheckoutUrl(null);
@@ -215,6 +251,9 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus() != OrderStatus.PAID) {
             throw new BusinessRuleException("Only a paid order can be refunded");
         }
+        if (order.getAmount().signum() == 0) {
+            throw new BusinessRuleException("This order was free, so there is nothing to refund");
+        }
 
         order.setStatus(OrderStatus.REFUNDED);
         order.setRefundedAt(Instant.now());
@@ -256,6 +295,9 @@ public class OrderServiceImpl implements OrderService {
                 course.getSlug(),
                 course.getTitle(),
                 course.getThumbnail(),
+                order.getListAmount(),
+                order.getDiscountAmount(),
+                order.getCoupon() == null ? null : order.getCoupon().getCode(),
                 order.getAmount(),
                 order.getCurrency(),
                 order.getStatus().name(),

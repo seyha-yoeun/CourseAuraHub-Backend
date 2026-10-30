@@ -1,5 +1,6 @@
 package com.course_aura_hub.order.model;
 
+import com.course_aura_hub.coupon.model.Coupon;
 import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.student.model.Student;
 import jakarta.persistence.Column;
@@ -47,6 +48,16 @@ public class Order {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "course_id", nullable = false, updatable = false)
     private Course course;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coupon_id", updatable = false)
+    private Coupon coupon;
+
+    @Column(name = "list_amount", nullable = false, updatable = false, precision = 10, scale = 2)
+    private BigDecimal listAmount;
+
+    @Column(name = "discount_amount", nullable = false, updatable = false, precision = 10, scale = 2)
+    private BigDecimal discountAmount;
 
     // The price the learner agreed to; later course price changes don't affect it
     @Column(name = "amount", nullable = false, updatable = false, precision = 10, scale = 2)
