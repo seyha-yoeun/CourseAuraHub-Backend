@@ -32,6 +32,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `learner` | Self-service: my courses, self-enroll, dashboard, achievements, profile, password, wishlist | `/api/v1/me` |
 | `certificate` | Completion certificates, public verification | `/api/v1/me/certificates`, `/api/v1/certificates/{number}` (public) |
 | `curriculum` | Sections, lessons, lesson progress | `/api/v1/courses/{slug}/curriculum`, `/api/v1/me/lessons` |
+| `order` | Checkout, order history, refunds, `PaymentGateway` port | `/api/v1/me/orders`, `/api/v1/admin/orders`, `/api/v1/payments/webhooks/{provider}` |
 | `review` | Course reviews and ratings | `/api/v1/courses/{slug}/reviews`, `/api/v1/me/courses/{slug}/review` |
 | `common` | `ApiResponse`, shared exceptions + `DomainExceptionHandler`, `SecurityUtils` | — |
 | `config` | Demo data seeder, domain config properties | — |
@@ -48,13 +49,14 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
   - Reuse `EnrollmentService.create/delete` instead of re-implementing enrollment side effects.
 - **Certificates are permanent**: issue them through `CertificateService` wherever `student_courses.completed` can flip to true (lesson completion and curriculum edits). They are never revoked when a course re-opens.
 - **Achievements and streaks are derived, not stored** (`LearnerStatsService`, `Achievement` enum). Streak days come from `lesson_progress.completed_at` in the caller's `timeZone`, so un-completing a lesson also removes that day's activity.
+- **Payments**: enrollment for paid courses happens only in `OrderService.applyPaymentEvent`, after the gateway verifies the webhook. Keep provider calls outside transactions (`CheckoutFacade`). The `fake` gateway lets anyone with the webhook secret mark orders paid; never enable it in production.
 - **Never expose learner PII** (email, total spent) to non-admins. The `enrolledStudentList` field on course detail is admin-only.
 - **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013` is a large mock-data seed.
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
 
 ## Roadmap (not yet built)
 
-1. Checkout and payments for paid courses (self-enroll currently allows free courses only), with order history.
+1. A real payment provider behind `PaymentGateway`; only the dev-only `fake` gateway exists, so paid checkout is off by default.
 2. Public anonymous catalog (`permitAll` on GET for courses, curriculum outline and reviews).
 3. Notifications feed (enrollment, new lesson, review reply).
 4. Lesson Q&A, discussions and personal notes.
