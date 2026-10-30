@@ -69,7 +69,7 @@ public class OrderServiceImpl implements OrderService {
                 .filter(found -> found.getStatus() == CourseStatus.PUBLISHED)
                 .orElseThrow(() -> ResourceNotFoundException.of("Course", courseSlug));
 
-        if (course.getPrice().signum() <= 0) {
+        if (course.currentPrice().price().signum() <= 0) {
             throw new BusinessRuleException("This course is free; enroll directly instead");
         }
         if (studentCourseRepository.existsByStudentIdAndCourseId(student.getId(), course.getId())) {

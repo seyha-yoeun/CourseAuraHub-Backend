@@ -73,7 +73,7 @@ public class LearnerFacadeImpl implements LearnerFacade {
                 .filter(found -> found.getStatus() == CourseStatus.PUBLISHED)
                 .orElseThrow(() -> ResourceNotFoundException.of("Course", courseSlug));
 
-        if (course.getPrice().signum() > 0) {
+        if (course.currentPrice().price().signum() > 0) {
             throw new BusinessRuleException("This course requires checkout. Paid enrollment is not available yet");
         }
 

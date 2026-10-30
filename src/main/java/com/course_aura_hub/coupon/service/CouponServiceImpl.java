@@ -9,10 +9,10 @@ import com.course_aura_hub.coupon.dto.CouponPreviewResponse;
 import com.course_aura_hub.coupon.dto.CouponResponse;
 import com.course_aura_hub.coupon.dto.CouponUpdateRequest;
 import com.course_aura_hub.coupon.model.Coupon;
-import com.course_aura_hub.coupon.model.DiscountType;
 import com.course_aura_hub.coupon.repository.CouponRepository;
 import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.course.model.CourseStatus;
+import com.course_aura_hub.course.model.DiscountType;
 import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.order.model.OrderStatus;
@@ -25,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -129,7 +128,7 @@ public class CouponServiceImpl implements CouponService {
     @Override
     public CouponQuote applyToOrder(String code, Course course, Integer studentId, Integer excludeOrderId) {
         if (!StringUtils.hasText(code)) {
-            return CouponQuote.none(course.getPrice());
+            return CouponQuote.none(course);
         }
         Coupon coupon = couponRepository.findByCodeForUpdate(normalize(code))
                 .orElseThrow(() -> new BusinessRuleException(INVALID_COUPON));
@@ -156,12 +155,11 @@ public class CouponServiceImpl implements CouponService {
             }
         }
 
-        BigDecimal price = course.getPrice();
-        BigDecimal discount = coupon.getDiscountType() == DiscountType.PERCENT
-                ? price.multiply(coupon.getDiscountValue()).divide(HUNDRED, 2, RoundingMode.HALF_UP)
-                : coupon.getDiscountValue();
-        discount = discount.min(price);
-        return new CouponQuote(coupon, price, discount, price.subtract(discount));
+        // A code stacks on a running sale
+        BigDecimal list = course.getPrice();
+        BigDecimal price = course.currentPrice().price();
+        BigDecimal couponOff = coupon.getDiscountType().amountOff(price, coupon.getDiscountValue());
+        return new CouponQuote(coupon, list, list.subtract(price).add(couponOff), price.subtract(couponOff));
     }
 
     private String normalize(String code) {
