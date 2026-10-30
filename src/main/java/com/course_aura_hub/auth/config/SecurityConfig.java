@@ -119,12 +119,12 @@ public class SecurityConfig {
                                 "/api/v1/settings",
                                 "/api/v1/settings/**"
                         ).hasRole("ADMIN")
-                        // Course writes are admin-only, reads are available to all authenticated users
+                        // Course writes are admin-only, reads are the public catalog
                         .requestMatchers(HttpMethod.POST, "/api/v1/courses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/courses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/courses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/courses/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/courses/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/courses/**").permitAll()
                         // Swagger & OpenAPI documentation
                         .requestMatchers(
                                 "/v3/api-docs/**",

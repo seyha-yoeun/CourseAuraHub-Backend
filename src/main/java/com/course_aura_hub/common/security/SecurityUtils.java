@@ -21,6 +21,11 @@ public final class SecurityUtils {
                 .anyMatch(authority::equals);
     }
 
+    /** The caller's email, or null on public endpoints reached without signing in. */
+    public static String emailOf(Authentication authentication) {
+        return authentication == null ? null : authentication.getName();
+    }
+
     public static boolean isAdmin(Authentication authentication) {
         return hasRole(authentication, "ADMIN");
     }
