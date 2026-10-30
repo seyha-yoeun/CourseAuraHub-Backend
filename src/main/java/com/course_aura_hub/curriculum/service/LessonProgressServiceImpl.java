@@ -1,10 +1,12 @@
 package com.course_aura_hub.curriculum.service;
 
+import com.course_aura_hub.certificate.service.CertificateService;
 import com.course_aura_hub.common.exception.ForbiddenActionException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.curriculum.dto.CourseProgress;
 import com.course_aura_hub.curriculum.dto.LessonProgressResponse;
+import com.course_aura_hub.curriculum.dto.NextLessonResponse;
 import com.course_aura_hub.curriculum.model.Lesson;
 import com.course_aura_hub.curriculum.model.LessonProgress;
 import com.course_aura_hub.curriculum.repository.CourseProgressProjection;
@@ -20,7 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -33,6 +38,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
     private final LessonProgressRepository lessonProgressRepository;
     private final StudentCourseRepository studentCourseRepository;
     private final LearnerAccountService learnerAccountService;
+    private final CertificateService certificateService;
 
     @Override
     @Transactional
@@ -79,6 +85,31 @@ public class LessonProgressServiceImpl implements LessonProgressService {
                 .collect(Collectors.toMap(CourseProgressProjection::getCourseId, Function.identity()));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Integer, NextLessonResponse> findNextLessons(Integer studentId, Collection<Integer> courseIds) {
+        if (courseIds.isEmpty()) {
+            return Map.of();
+        }
+        Set<Integer> completedIds = Set.copyOf(lessonProgressRepository.findAllCompletedLessonIds(studentId));
+        Map<Integer, NextLessonResponse> nextByCourse = new HashMap<>();
+        // Lessons arrive grouped by course in curriculum order, so the first incomplete one per course wins
+        for (Lesson lesson : lessonRepository.findInCurriculumOrderByCourseIds(courseIds)) {
+            Integer courseId = lesson.getSection().getCourse().getId();
+            if (!completedIds.contains(lesson.getId()) && !nextByCourse.containsKey(courseId)) {
+                nextByCourse.put(courseId, new NextLessonResponse(
+                        lesson.getId(),
+                        lesson.getTitle(),
+                        lesson.getType().apiValue(),
+                        lesson.getDurationMinutes(),
+                        lesson.getSection().getId(),
+                        lesson.getSection().getTitle()
+                ));
+            }
+        }
+        return nextByCourse;
+    }
+
     private LessonProgressResponse buildResponse(
             Integer lessonId,
             boolean lessonCompleted,
@@ -94,6 +125,9 @@ public class LessonProgressServiceImpl implements LessonProgressService {
             studentCourse.setCompleted(courseCompleted);
             log.info("Course completion changed studentId={} courseId={} completed={}",
                     student.getId(), course.getId(), courseCompleted);
+        }
+        if (courseCompleted) {
+            certificateService.issueIfAbsent(student.getId(), course.getId());
         }
         student.setLastActive(LocalDate.now());
 

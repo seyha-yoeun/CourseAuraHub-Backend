@@ -1,5 +1,6 @@
 package com.course_aura_hub.curriculum.service;
 
+import com.course_aura_hub.certificate.service.CertificateService;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.course.model.Course;
@@ -50,6 +51,7 @@ public class CurriculumServiceImpl implements CurriculumService {
     private final StudentCourseRepository studentCourseRepository;
     private final LearnerAccountService learnerAccountService;
     private final CurriculumAssembler curriculumAssembler;
+    private final CertificateService certificateService;
 
     @Override
     @Transactional(readOnly = true)
@@ -79,6 +81,12 @@ public class CurriculumServiceImpl implements CurriculumService {
         CourseProgress progress = enrollment
                 .map(sc -> CourseProgress.of(completedIds.size(), totalLessons, sc.isCompleted()))
                 .orElse(null);
+        Integer nextLessonId = progress == null || progress.completed() ? null : sections.stream()
+                .flatMap(section -> section.lessons().stream())
+                .filter(lesson -> !lesson.completed())
+                .map(LessonResponse::id)
+                .findFirst()
+                .orElse(null);
 
         return new CurriculumResponse(
                 course.getId(),
@@ -87,6 +95,7 @@ public class CurriculumServiceImpl implements CurriculumService {
                 totalLessons,
                 totalMinutes,
                 progress,
+                nextLessonId,
                 sections
         );
     }
@@ -218,7 +227,8 @@ public class CurriculumServiceImpl implements CurriculumService {
     }
 
     /**
-     * Keeps the denormalized course totals and every learner's completion flag in sync with the lesson set.
+     * Keeps the denormalized course totals and every learner's completion flag in sync with the lesson set,
+     * and certifies learners the change has just completed (for example when their last unfinished lesson is removed).
      */
     private void refreshCourseTotals(Course course) {
         long lessonCount = lessonRepository.countByCourseId(course.getId());
@@ -229,8 +239,9 @@ public class CurriculumServiceImpl implements CurriculumService {
         course.setUpdatedAt(LocalDate.now());
 
         int updated = lessonProgressRepository.recalculateCourseCompletion(course.getId(), lessonCount);
-        log.debug("Refreshed course totals courseId={} lessons={} minutes={} learnersRecalculated={}",
-                course.getId(), lessonCount, minutes, updated);
+        int certified = certificateService.issueForCompletedLearners(course.getId());
+        log.debug("Refreshed course totals courseId={} lessons={} minutes={} learnersRecalculated={} certified={}",
+                course.getId(), lessonCount, minutes, updated, certified);
     }
 
     private Course findCourse(String slug) {
