@@ -5,6 +5,7 @@ import com.course_aura_hub.common.exception.ForbiddenActionException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.curriculum.dto.CourseProgress;
+import com.course_aura_hub.curriculum.dto.LessonPositionResponse;
 import com.course_aura_hub.curriculum.dto.LessonProgressResponse;
 import com.course_aura_hub.curriculum.dto.NextLessonResponse;
 import com.course_aura_hub.curriculum.model.Lesson;
@@ -16,6 +17,10 @@ import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.student.model.Student;
 import com.course_aura_hub.student.model.StudentCourse;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
+import com.course_aura_hub.common.exception.BusinessRuleException;
+import com.course_aura_hub.curriculum.model.LessonType;
+import com.course_aura_hub.curriculum.model.LessonWatchPosition;
+import com.course_aura_hub.curriculum.repository.LessonWatchPositionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -36,6 +42,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
 
     private final LessonRepository lessonRepository;
     private final LessonProgressRepository lessonProgressRepository;
+    private final LessonWatchPositionRepository lessonWatchPositionRepository;
     private final StudentCourseRepository studentCourseRepository;
     private final LearnerAccountService learnerAccountService;
     private final CertificateService certificateService;
@@ -53,6 +60,8 @@ public class LessonProgressServiceImpl implements LessonProgressService {
                     .student(student)
                     .lesson(lesson)
                     .build());
+            // A finished video starts over when rewatched
+            lessonWatchPositionRepository.deleteByStudentIdAndLessonId(student.getId(), lessonId);
             log.info("Marked lesson complete lessonId={} studentId={} courseId={}",
                     lessonId, student.getId(), course.getId());
         }
@@ -79,6 +88,18 @@ public class LessonProgressServiceImpl implements LessonProgressService {
     }
 
     @Override
+    @Transactional
+    public LessonPositionResponse savePosition(String email, Integer lessonId, int positionSeconds) {
+        Lesson lesson = findLesson(lessonId);
+        if (lesson.getType() != LessonType.VIDEO) {
+            throw new BusinessRuleException("Only video lessons have a playback position");
+        }
+        Student student = requireEnrollment(email, lesson.getSection().getCourse()).getStudent();
+        lessonWatchPositionRepository.upsert(student.getId(), lessonId, positionSeconds);
+        return new LessonPositionResponse(lessonId, positionSeconds);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Map<Integer, CourseProgressProjection> summarizeByStudent(Integer studentId) {
         return lessonProgressRepository.summarizeByStudent(studentId).stream()
@@ -92,21 +113,29 @@ public class LessonProgressServiceImpl implements LessonProgressService {
             return Map.of();
         }
         Set<Integer> completedIds = Set.copyOf(lessonProgressRepository.findAllCompletedLessonIds(studentId));
-        Map<Integer, NextLessonResponse> nextByCourse = new HashMap<>();
+        Map<Integer, Lesson> nextLessons = new HashMap<>();
         // Lessons arrive grouped by course in curriculum order, so the first incomplete one per course wins
         for (Lesson lesson : lessonRepository.findInCurriculumOrderByCourseIds(courseIds)) {
-            Integer courseId = lesson.getSection().getCourse().getId();
-            if (!completedIds.contains(lesson.getId()) && !nextByCourse.containsKey(courseId)) {
-                nextByCourse.put(courseId, new NextLessonResponse(
-                        lesson.getId(),
-                        lesson.getTitle(),
-                        lesson.getType().apiValue(),
-                        lesson.getDurationMinutes(),
-                        lesson.getSection().getId(),
-                        lesson.getSection().getTitle()
-                ));
+            if (!completedIds.contains(lesson.getId())) {
+                nextLessons.putIfAbsent(lesson.getSection().getCourse().getId(), lesson);
             }
         }
+
+        List<Integer> lessonIds = nextLessons.values().stream().map(Lesson::getId).toList();
+        Map<Integer, Integer> positions = lessonWatchPositionRepository
+                .findByStudentIdAndLessonIdIn(studentId, lessonIds).stream()
+                .collect(Collectors.toMap(LessonWatchPosition::getLessonId, LessonWatchPosition::getPositionSeconds));
+
+        Map<Integer, NextLessonResponse> nextByCourse = new HashMap<>();
+        nextLessons.forEach((courseId, lesson) -> nextByCourse.put(courseId, new NextLessonResponse(
+                lesson.getId(),
+                lesson.getTitle(),
+                lesson.getType().apiValue(),
+                lesson.getDurationMinutes(),
+                lesson.getSection().getId(),
+                lesson.getSection().getTitle(),
+                positions.get(lesson.getId())
+        )));
         return nextByCourse;
     }
 

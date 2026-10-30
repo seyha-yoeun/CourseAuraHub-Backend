@@ -24,6 +24,10 @@ import com.course_aura_hub.curriculum.repository.LessonRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.student.model.StudentCourse;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
+import com.course_aura_hub.curriculum.model.LessonWatchPosition;
+import com.course_aura_hub.curriculum.repository.LessonWatchPositionRepository;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,6 +52,7 @@ public class CurriculumServiceImpl implements CurriculumService {
     private final CourseSectionRepository sectionRepository;
     private final LessonRepository lessonRepository;
     private final LessonProgressRepository lessonProgressRepository;
+    private final LessonWatchPositionRepository lessonWatchPositionRepository;
     private final StudentCourseRepository studentCourseRepository;
     private final LearnerAccountService learnerAccountService;
     private final CurriculumAssembler curriculumAssembler;
@@ -71,9 +76,13 @@ public class CurriculumServiceImpl implements CurriculumService {
                         sc.getStudent().getId(), course.getId())))
                 .orElse(Set.of());
 
-        List<SectionResponse> sections = sectionRepository.findByCourseIdOrderByPositionAscIdAsc(course.getId())
-                .stream()
-                .map(section -> curriculumAssembler.toResponse(section, admin || enrolled, completedIds))
+        List<CourseSection> courseSections = sectionRepository.findByCourseIdOrderByPositionAscIdAsc(course.getId());
+        Map<Integer, Integer> positions = enrollment
+                .map(sc -> findPositions(sc.getStudent().getId(), courseSections))
+                .orElse(Map.of());
+
+        List<SectionResponse> sections = courseSections.stream()
+                .map(section -> curriculumAssembler.toResponse(section, admin || enrolled, completedIds, positions))
                 .toList();
 
         int totalLessons = sections.stream().mapToInt(section -> section.lessons().size()).sum();
@@ -256,5 +265,14 @@ public class CurriculumServiceImpl implements CurriculumService {
 
     private String trimToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private Map<Integer, Integer> findPositions(Integer studentId, List<CourseSection> sections) {
+        List<Integer> lessonIds = sections.stream()
+                .flatMap(section -> section.getLessons().stream())
+                .map(Lesson::getId)
+                .toList();
+        return lessonWatchPositionRepository.findByStudentIdAndLessonIdIn(studentId, lessonIds).stream()
+                .collect(Collectors.toMap(LessonWatchPosition::getLessonId, LessonWatchPosition::getPositionSeconds));
     }
 }
