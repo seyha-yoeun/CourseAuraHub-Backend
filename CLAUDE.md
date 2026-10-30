@@ -24,7 +24,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | Module | Purpose | Base path |
 |---|---|---|
 | `auth` | Users, JWT cookies, OAuth2, lockout, rate limiting, `SecurityConfig` | `/api/v1/auth` |
-| `course` | Course catalog (admin CRUD, public read) | `/api/v1/courses` |
+| `course` | Course catalog (admin CRUD, public read), scheduled sale prices | `/api/v1/courses`, `/api/v1/admin/discounts` (ADMIN) |
 | `student` | Admin student management | `/api/v1/students` (ADMIN) |
 | `enrollment` | Admin enrollments; keeps counters + monthly metrics in sync | `/api/v1/enrollments` (ADMIN) |
 | `dashboard` | Admin stats | `/api/v1/stats` (ADMIN) |
@@ -51,6 +51,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Certificates are permanent**: issue them through `CertificateService` wherever `student_courses.completed` can flip to true (lesson completion and curriculum edits). They are never revoked when a course re-opens.
 - **Achievements and streaks are derived, not stored** (`LearnerStatsService`, `Achievement` enum). Streak days come from `lesson_progress.completed_at` in the caller's `timeZone`, so un-completing a lesson also removes that day's activity.
 - **Payments**: enrollment for paid courses happens only in `OrderService.applyPaymentEvent`, after the gateway verifies the webhook. Keep provider calls outside transactions (`CheckoutFacade`). The `fake` gateway lets anyone with the webhook secret mark orders paid; never enable it in production.
+- **Sale prices**: `courses.price` is always the regular price and a sale is never written to it. Use `Course.currentPrice()` for anything a learner sees or pays. Admin course responses keep the regular price, because the edit form saves it back. Catalog sorting by price uses the regular price.
 - **Coupons**: price orders only through `CouponService.applyToOrder`, which locks the coupon inside the order's transaction. `Order.amount` is what the learner pays, `listAmount` the price before discount. Orders that reach zero settle without a provider.
 - **Never expose learner PII** (email, total spent) to non-admins. The `enrolledStudentList` field on course detail is admin-only.
 - **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013` is a large mock-data seed.

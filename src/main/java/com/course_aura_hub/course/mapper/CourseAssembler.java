@@ -1,8 +1,11 @@
 package com.course_aura_hub.course.mapper;
 
 import com.course_aura_hub.course.dto.CourseResponse;
+import com.course_aura_hub.course.dto.CourseSaleResponse;
 import com.course_aura_hub.course.model.Course;
+import com.course_aura_hub.course.model.CourseDiscount;
 import com.course_aura_hub.course.model.CourseMonthlyMetric;
+import com.course_aura_hub.course.model.CoursePrice;
 import com.course_aura_hub.student.dto.StudentResponse;
 import com.course_aura_hub.student.mapper.StudentAssembler;
 import com.course_aura_hub.student.model.Student;
@@ -26,14 +29,15 @@ public class CourseAssembler {
     /** Catalog view for visitors and learners: sales figures are admin-only. */
     public CourseResponse toPublicResponse(Course course, Boolean enrolled) {
         CourseResponse full = toResponse(course, null, enrolled);
+        CoursePrice current = course.currentPrice();
         return new CourseResponse(
                 full.id(),
                 full.slug(),
                 full.title(),
                 full.description(),
                 full.instructor(),
-                full.price(),
-                full.originalPrice(),
+                current.price(),
+                current.originalPrice(),
                 full.status(),
                 full.category(),
                 full.level(),
@@ -50,7 +54,8 @@ public class CourseAssembler {
                 null,
                 null,
                 null,
-                enrolled
+                enrolled,
+                full.sale()
         );
     }
 
@@ -58,7 +63,7 @@ public class CourseAssembler {
         return toResponse(course, enrolledStudents, null);
     }
 
-    /** Admin view, with sales metrics. */
+    /** Admin view, with sales metrics. Keeps the regular price, because the edit form saves it back. */
     public CourseResponse toResponse(Course course, List<Student> enrolledStudents, Boolean enrolled) {
         Map<Short, CourseMonthlyMetric> metricsByMonth = new LinkedHashMap<>();
         for (CourseMonthlyMetric metric : course.getMonthlyMetrics()) {
@@ -101,7 +106,21 @@ public class CourseAssembler {
                 List.copyOf(monthlyEnrollments),
                 List.copyOf(monthlyRevenue),
                 enrolledStudentList,
-                enrolled
+                enrolled,
+                toSaleResponse(course.currentPrice())
+        );
+    }
+
+    private CourseSaleResponse toSaleResponse(CoursePrice current) {
+        CourseDiscount discount = current.discount();
+        if (discount == null) {
+            return null;
+        }
+        return new CourseSaleResponse(
+                current.price(),
+                discount.getDiscountType().name(),
+                discount.getDiscountValue(),
+                discount.getEndsAt()
         );
     }
 }

@@ -31,6 +31,8 @@ public record CourseResponse(
         List<BigDecimal> monthlyRevenue,
         List<StudentResponse> enrolledStudentList,
         // Whether the caller is enrolled; null on list responses
-        Boolean enrolled
+        Boolean enrolled,
+        // The running sale, or null. price already includes it, except for admins, who see the regular price
+        CourseSaleResponse sale
 ) {
 }

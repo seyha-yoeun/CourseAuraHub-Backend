@@ -67,7 +67,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         }
 
         LocalDate enrolledAt = request.enrolledAt() == null ? LocalDate.now() : request.enrolledAt();
-        BigDecimal amount = request.amount() == null ? course.getPrice() : request.amount();
+        BigDecimal amount = request.amount() == null ? course.currentPrice().price() : request.amount();
         if (amount.signum() < 0) {
             throw new BusinessRuleException("Enrollment amount cannot be negative");
         }
