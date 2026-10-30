@@ -33,4 +33,14 @@ public interface StudentCourseRepository extends JpaRepository<StudentCourse, St
     Optional<StudentCourse> findByStudentIdAndCourseId(Integer studentId, Integer courseId);
 
     boolean existsByStudentIdAndCourseId(Integer studentId, Integer courseId);
+
+    @Query("""
+            select count(sc) > 0
+            from StudentCourse sc
+            join sc.student s
+            left join s.user u
+            where sc.course.id = :courseId
+              and (lower(u.email) = lower(:email) or (s.user is null and lower(s.email) = lower(:email)))
+            """)
+    boolean isUserEnrolled(@Param("email") String email, @Param("courseId") Integer courseId);
 }

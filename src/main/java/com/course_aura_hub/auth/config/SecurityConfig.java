@@ -97,6 +97,10 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/oauth2/**"
                         ).permitAll()
+                        // Learner self-service (my courses, profile, wishlist, progress, reviews, achievements)
+                        .requestMatchers("/api/v1/me", "/api/v1/me/**").authenticated()
+                        // Public certificate verification (numbers are unguessable; no contact details exposed)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/certificates/*").permitAll()
                         // Account administration
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // Client-safe platform branding

@@ -60,14 +60,15 @@ public class CourseController {
     @PreAuthorize("isAuthenticated()")
     @Operation(
             summary = "Get course",
-            description = "Returns a course with its monthly metrics and enrolled students. Clients can only see published courses."
+            description = "Returns a course with its monthly metrics and whether the caller is enrolled. "
+                    + "Admins also receive the enrolled-student list. Clients can only see published courses."
     )
     public ResponseEntity<ApiResponse<CourseResponse>> findBySlug(
             @PathVariable String slug,
             Authentication authentication
     ) {
-        boolean includeUnpublished = SecurityUtils.isAdmin(authentication);
-        return ResponseEntity.ok(ApiResponse.success(courseService.findBySlug(slug, includeUnpublished)));
+        boolean admin = SecurityUtils.isAdmin(authentication);
+        return ResponseEntity.ok(ApiResponse.success(courseService.findBySlug(slug, admin, authentication.getName())));
     }
 
     @PostMapping

@@ -69,17 +69,20 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional(readOnly = true)
-    public CourseResponse findBySlug(String slug, boolean includeUnpublished) {
+    public CourseResponse findBySlug(String slug, boolean admin, String viewerEmail) {
         Course course = courseRepository.findBySlug(slug)
                 .orElseThrow(() -> ResourceNotFoundException.of("Course", slug));
 
-        if (!includeUnpublished && course.getStatus() != CourseStatus.PUBLISHED) {
+        if (!admin && course.getStatus() != CourseStatus.PUBLISHED) {
             throw ResourceNotFoundException.of("Course", slug);
         }
 
-        List<Student> enrolledStudents = studentCourseRepository.findStudentsByCourseId(course.getId());
-        log.debug("Fetched course slug={} with {} enrolled students", slug, enrolledStudents.size());
-        return courseAssembler.toResponse(course, enrolledStudents);
+        boolean enrolled = viewerEmail != null && studentCourseRepository.isUserEnrolled(viewerEmail, course.getId());
+
+        // The enrolled-student list contains learner PII (emails, spending) and is admin-only
+        List<Student> enrolledStudents = admin ? studentCourseRepository.findStudentsByCourseId(course.getId()) : null;
+        log.debug("Fetched course slug={} admin={} enrolled={}", slug, admin, enrolled);
+        return courseAssembler.toResponse(course, enrolledStudents, enrolled);
     }
 
     @Override
