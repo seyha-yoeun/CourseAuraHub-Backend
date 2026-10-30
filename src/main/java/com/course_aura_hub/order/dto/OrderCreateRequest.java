@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 
 public record OrderCreateRequest(
         @NotBlank(message = "Course slug is required")
-        String courseSlug
+        String courseSlug,
+        // Optional discount code
+        String couponCode
 ) {
 }

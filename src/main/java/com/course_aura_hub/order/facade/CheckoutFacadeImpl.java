@@ -26,9 +26,18 @@ public class CheckoutFacadeImpl implements CheckoutFacade {
     private final PaymentProperties paymentProperties;
 
     @Override
-    public OrderResponse checkout(String email, String courseSlug) {
-        PaymentGateway gateway = requireGateway();
-        Order order = orderService.openOrder(email, courseSlug, paymentProperties.currency(), gateway.name());
+    public OrderResponse checkout(String email, String courseSlug, String couponCode) {
+        PaymentGateway gateway = paymentGateway.getIfAvailable();
+        Order order = orderService.openOrder(
+                email,
+                courseSlug,
+                couponCode,
+                paymentProperties.currency(),
+                gateway == null ? null : gateway.name()
+        );
+        if (order.getAmount().signum() == 0) {
+            return orderService.completeFreeOrder(order.getOrderNumber());
+        }
         if (order.getCheckoutUrl() != null) {
             return orderService.findMine(email, order.getOrderNumber());
         }
