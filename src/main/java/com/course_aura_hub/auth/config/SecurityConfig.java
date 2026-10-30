@@ -7,6 +7,7 @@ import com.course_aura_hub.auth.security.OAuth2AuthenticationSuccessHandler;
 import com.course_aura_hub.auth.security.oauth2.ProviderEmailEnrichingOAuth2UserService;
 import com.course_aura_hub.common.dto.ApiResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -89,6 +90,8 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // A stream was authorized when it opened; JwtAuthFilter does not run again when it closes
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         // Public Auth Endpoints & OAuth2 Authorization Endpoints
                         .requestMatchers(PUBLIC_AUTH_ENDPOINTS).permitAll()
                         .requestMatchers(

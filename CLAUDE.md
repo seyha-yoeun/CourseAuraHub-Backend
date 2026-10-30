@@ -34,6 +34,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `curriculum` | Sections, lessons, lesson progress, video resume | `/api/v1/courses/{slug}/curriculum`, `/api/v1/me/lessons` |
 | `order` | Checkout, order history, refunds, `PaymentGateway` port | `/api/v1/me/orders`, `/api/v1/admin/orders`, `/api/v1/payments/webhooks/{provider}` |
 | `coupon` | Discount codes; redemptions are derived from orders | `/api/v1/me/coupons/preview`, `/api/v1/admin/coupons` |
+| `notification` | Saved notifications and the live SSE stream | `/api/v1/me/notifications`, `/api/v1/me/notifications/stream` |
 | `review` | Course reviews and ratings | `/api/v1/courses/{slug}/reviews`, `/api/v1/me/courses/{slug}/review` |
 | `common` | `ApiResponse`, shared exceptions + `DomainExceptionHandler`, `SecurityUtils` | — |
 | `config` | Demo data seeder, domain config properties | — |
@@ -53,6 +54,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Payments**: enrollment for paid courses happens only in `OrderService.applyPaymentEvent`, after the gateway verifies the webhook. Keep provider calls outside transactions (`CheckoutFacade`). The `fake` gateway lets anyone with the webhook secret mark orders paid; never enable it in production.
 - **Sale prices**: `courses.price` is always the regular price and a sale is never written to it. Use `Course.currentPrice()` for anything a learner sees or pays. Admin course responses keep the regular price, because the edit form saves it back. Catalog sorting by price uses the regular price.
 - **Coupons**: price orders only through `CouponService.applyToOrder`, which locks the coupon inside the order's transaction. `Order.amount` is what the learner pays, `listAmount` the price before discount. Orders that reach zero settle without a provider.
+- **Notifications**: call `NotificationService` inside the business transaction, so the row commits or rolls back with the change. Pushes happen after commit on the dispatcher's own threads. Open streams are held in memory per instance, so a push only reaches clients on the same server; the REST feed is always complete.
 - **Never expose learner PII** (email, total spent) to non-admins. The `enrolledStudentList` field on course detail is admin-only.
 - **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013` is a large mock-data seed.
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
@@ -60,7 +62,6 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 ## Roadmap (not yet built)
 
 1. A real payment provider behind `PaymentGateway`; only the dev-only `fake` gateway exists, so paid checkout is off by default.
-2. Notifications feed (enrollment, new lesson, review reply).
-3. Lesson Q&A, discussions and personal notes.
-4. Categories and instructors as real entities, plus instructor profile pages.
-5. Recommendations by tags and category.
+2. Lesson Q&A, discussions and personal notes.
+3. Categories and instructors as real entities, plus instructor profile pages.
+4. Recommendations by tags and category.

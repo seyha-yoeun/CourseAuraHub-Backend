@@ -5,7 +5,10 @@ import com.course_aura_hub.certificate.dto.CertificateVerificationResponse;
 import com.course_aura_hub.certificate.mapper.CertificateMapper;
 import com.course_aura_hub.certificate.repository.CourseCertificateRepository;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
+import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
+import com.course_aura_hub.notification.model.NotificationType;
+import com.course_aura_hub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,8 @@ public class CertificateServiceImpl implements CertificateService {
     private final CertificateNumberGenerator numberGenerator;
     private final CertificateMapper certificateMapper;
     private final LearnerAccountService learnerAccountService;
+    private final CourseRepository courseRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -31,7 +36,7 @@ public class CertificateServiceImpl implements CertificateService {
         if (certificateRepository.existsByStudentIdAndCourseId(studentId, courseId)) {
             return false;
         }
-        boolean issued = certificateRepository.insertIfAbsent(numberGenerator.next(), studentId, courseId) > 0;
+        boolean issued = issue(studentId, courseId);
         if (issued) {
             log.info("Issued course certificate studentId={} courseId={}", studentId, courseId);
         }
@@ -43,10 +48,28 @@ public class CertificateServiceImpl implements CertificateService {
     public int issueForCompletedLearners(Integer courseId) {
         int issued = 0;
         for (Integer studentId : certificateRepository.findCompletedStudentIdsWithoutCertificate(courseId)) {
-            issued += certificateRepository.insertIfAbsent(numberGenerator.next(), studentId, courseId);
+            if (issue(studentId, courseId)) {
+                issued++;
+            }
         }
         if (issued > 0) {
             log.info("Issued course certificates after curriculum change courseId={} count={}", courseId, issued);
+        }
+        return issued;
+    }
+
+    private boolean issue(Integer studentId, Integer courseId) {
+        String number = numberGenerator.next();
+        boolean issued = certificateRepository.insertIfAbsent(number, studentId, courseId) > 0;
+        if (issued) {
+            String courseTitle = courseRepository.findById(courseId).orElseThrow().getTitle();
+            notificationService.notifyStudent(
+                    studentId,
+                    NotificationType.CERTIFICATE_ISSUED,
+                    "Certificate earned",
+                    "You completed " + courseTitle + ". Your certificate is ready.",
+                    "/certificates/" + number
+            );
         }
         return issued;
     }
