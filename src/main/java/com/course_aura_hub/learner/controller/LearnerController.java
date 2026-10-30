@@ -1,9 +1,11 @@
 package com.course_aura_hub.learner.controller;
 
 import com.course_aura_hub.auth.dto.AuthResponse;
+import com.course_aura_hub.auth.dto.ChangePasswordRequest;
+import com.course_aura_hub.auth.facade.AuthFacade;
+import com.course_aura_hub.auth.security.AuthUserPrincipal;
 import com.course_aura_hub.auth.security.AuthCookieService;
 import com.course_aura_hub.common.dto.ApiResponse;
-import com.course_aura_hub.learner.dto.ChangePasswordRequest;
 import com.course_aura_hub.learner.dto.LearnerProfileResponse;
 import com.course_aura_hub.learner.dto.LearnerProfileUpdateRequest;
 import com.course_aura_hub.learner.dto.MyCourseResponse;
@@ -22,6 +24,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -45,6 +48,7 @@ public class LearnerController {
     private final LearnerFacade learnerFacade;
     private final ProfileService profileService;
     private final WishlistService wishlistService;
+    private final AuthFacade authFacade;
     private final AuthCookieService authCookieService;
 
     @GetMapping("/courses")
@@ -94,15 +98,15 @@ public class LearnerController {
     @PutMapping("/password")
     @Operation(
             summary = "Change my password",
-            description = "Local accounts only. Returns a fresh token pair in the body and as auth cookies, "
-                    + "and revokes other sessions' refresh tokens."
+            description = "Alias of POST /api/v1/auth/password/change kept for existing clients. Local accounts only. "
+                    + "Returns a fresh session in the body and as auth cookies, and signs out all other sessions."
     )
     public ResponseEntity<ApiResponse<AuthResponse>> changePassword(
             @Valid @RequestBody ChangePasswordRequest request,
-            Authentication authentication,
+            @AuthenticationPrincipal AuthUserPrincipal principal,
             HttpServletResponse response
     ) {
-        AuthResponse authResponse = learnerFacade.changePassword(authentication.getName(), request);
+        AuthResponse authResponse = authFacade.changePassword(principal.getUserId(), request);
         authCookieService.setAuthCookies(response, authResponse);
         // Token-forwarding clients (the Nuxt server proxy) read the new pair from the body, like login
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully", authResponse));

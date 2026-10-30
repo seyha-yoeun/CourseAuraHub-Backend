@@ -25,6 +25,12 @@ public record UserResponse(
         @Schema(description = "User authentication provider", example = "LOCAL")
         String provider,
 
+        @Schema(description = "Whether the account email address has been verified", example = "true")
+        boolean emailVerified,
+
+        @Schema(description = "Whether two-factor authentication is enabled", example = "false")
+        boolean mfaEnabled,
+
         @Schema(description = "Profile avatar URL, if set", example = "https://example.com/avatar.png")
         String imageUrl
 ) {

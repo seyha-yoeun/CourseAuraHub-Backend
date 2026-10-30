@@ -23,7 +23,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
-    show-sql: ${SPRING_JPA_SHOW_SQL:true}
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: true
@@ -35,6 +35,24 @@ spring:
     baseline-version: 0
     locations: classpath:db/migration
     validate-on-migrate: true
+
+  # SMTP delivery for verification codes, reset links and security notices.
+  # Defaults target a local Mailpit (docker compose); set real credentials via env vars.
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+            required: ${MAIL_SMTP_STARTTLS_REQUIRED:false}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
   security:
     oauth2:
@@ -68,19 +86,12 @@ spring:
 
 
 jwt:
-  secret: ${JWT_SECRET:1234567}
+  # Required. At least 32 random bytes, e.g. `openssl rand -base64 48`. Startup fails if missing or weak.
+  secret: ${JWT_SECRET:}
   access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:900000}
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000}
 
 app:
-  security:
-    bootstrap-admin:
-      # Optional one-time local/bootstrap admin. Leave blank to disable.
-      email: ${BOOTSTRAP_ADMIN_EMAIL:}
-      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
-      # Comma-separated list of already-registered emails to promote on startup.
-      promote-emails: ${BOOTSTRAP_ADMIN_PROMOTE_EMAILS:}
-
   demo-data:
     # Opt-in import of the bundled frontend mock dataset. Never overwrites existing rows.
     enabled: ${DEMO_DATA_ENABLED:false}
@@ -104,6 +115,65 @@ app:
 
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
+    # Upper bound on tracked client/endpoint buckets (LRU eviction)
+    max-tracked-clients: ${RATE_LIMIT_MAX_TRACKED_CLIENTS:50000}
+    default-rule:
+      capacity: 100
+      period: 1m
+    # Built-in per-endpoint rules (register, login, refresh, logout, verify-email, resend-verification,
+    # forgot-password, reset-password, mfa-verify) can be overridden by name, e.g.:
+    # rules:
+    #   login: { path: /api/v1/auth/login, capacity: 10, period: 1m }
+
+  cors:
+    # Comma-separated trusted frontend origins. Wildcards are rejected because credentials are allowed.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+  mail:
+    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:no-reply@courseaurahub.local}
+    from-name: ${MAIL_FROM_NAME:CourseAuraHub}
+
+  security:
+    bootstrap-admin:
+      # Optional one-time local/bootstrap admin. Leave blank to disable.
+      email: ${BOOTSTRAP_ADMIN_EMAIL:}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+      # Comma-separated list of already-registered emails to promote on startup.
+      promote-emails: ${BOOTSTRAP_ADMIN_PROMOTE_EMAILS:}
+    auth:
+      # Proxies whose X-Forwarded-For header is trusted (IPs or CIDRs, comma-separated). Empty = trust none.
+      trusted-proxies: ${TRUSTED_PROXIES:}
+      token-retention: 7d
+      email-verification:
+        code-length: ${EMAIL_OTP_LENGTH:6}
+        code-ttl: ${EMAIL_OTP_TTL:10m}
+        max-attempts: ${EMAIL_OTP_MAX_ATTEMPTS:5}
+        resend-cooldown: ${EMAIL_OTP_RESEND_COOLDOWN:60s}
+        max-codes-per-hour: ${EMAIL_OTP_MAX_PER_HOUR:5}
+      password-reset:
+        token-ttl: ${PASSWORD_RESET_TTL:30m}
+        request-cooldown: ${PASSWORD_RESET_COOLDOWN:60s}
+        max-requests-per-hour: ${PASSWORD_RESET_MAX_PER_HOUR:5}
+        # Frontend page that reads ?token= and calls POST /api/v1/auth/reset-password
+        reset-url: ${PASSWORD_RESET_URL:http://localhost:3000/auth/reset-password}
+      lockout:
+        max-failed-attempts: ${LOGIN_MAX_FAILED_ATTEMPTS:5}
+        lock-duration: ${LOGIN_LOCK_DURATION:15m}
+      session:
+        max-active-per-user: ${SESSION_MAX_ACTIVE_PER_USER:10}
+        remember-me-ttl: ${SESSION_REMEMBER_ME_TTL:30d}
+        # Window in which a just-rotated refresh token is rejected without revoking the session (parallel refreshes)
+        reuse-grace-period: ${SESSION_REUSE_GRACE_PERIOD:10s}
+      mfa:
+        issuer: ${MFA_ISSUER:CourseAuraHub}
+        # Base64 32-byte AES key (`openssl rand -base64 32`). 2FA enrollment is unavailable when empty.
+        encryption-key: ${MFA_ENCRYPTION_KEY:}
+        challenge-ttl: 5m
+        max-challenge-attempts: 5
+        recovery-code-count: 10
+      oauth2:
+        trust-facebook-email: ${OAUTH2_TRUST_FACEBOOK_EMAIL:false}
 
 springdoc:
   api-docs:
@@ -116,11 +186,10 @@ springdoc:
     tags-sorter: alpha
     try-it-out-enabled: true
 
+# Bind-parameter tracing (org.hibernate.orm.jdbc.bind) would log password and token hashes; keep it off.
 logging:
   level:
     root: INFO
-    com.course_aura_hub: DEBUG
-    org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
-    org.flywaydb: DEBUG
+    com.course_aura_hub: ${LOG_LEVEL_APP:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:INFO}

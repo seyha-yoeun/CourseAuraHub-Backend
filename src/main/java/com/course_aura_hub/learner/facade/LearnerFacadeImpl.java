@@ -1,7 +1,5 @@
 package com.course_aura_hub.learner.facade;
 
-import com.course_aura_hub.auth.dto.AuthResponse;
-import com.course_aura_hub.auth.service.AuthService;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.course.model.Course;
@@ -15,7 +13,6 @@ import com.course_aura_hub.enrollment.dto.EnrollmentResponse;
 import com.course_aura_hub.enrollment.model.Enrollment;
 import com.course_aura_hub.enrollment.repository.EnrollmentRepository;
 import com.course_aura_hub.enrollment.service.EnrollmentService;
-import com.course_aura_hub.learner.dto.ChangePasswordRequest;
 import com.course_aura_hub.learner.dto.MyCourseResponse;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.learner.service.WishlistService;
@@ -47,7 +44,6 @@ public class LearnerFacadeImpl implements LearnerFacade {
     private final CourseRepository courseRepository;
     private final LessonProgressService lessonProgressService;
     private final WishlistService wishlistService;
-    private final AuthService authService;
 
     @Override
     @Transactional(readOnly = true)
@@ -87,12 +83,6 @@ public class LearnerFacadeImpl implements LearnerFacade {
                 CourseProgress.of(0, course.getTotalLessons(), false),
                 null
         );
-    }
-
-    @Override
-    @Transactional
-    public AuthResponse changePassword(String email, ChangePasswordRequest request) {
-        return authService.changePassword(email, request.currentPassword(), request.newPassword());
     }
 
     private List<MyCourseResponse> buildMyCourses(Student student) {
