@@ -92,6 +92,12 @@ jwt:
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000}
 
 app:
+  payment:
+    # Payment gateway id. Empty disables paid checkout; "fake" is for development only.
+    provider: ${PAYMENT_PROVIDER:}
+    currency: ${PAYMENT_CURRENCY:USD}
+    webhook-secret: ${PAYMENT_WEBHOOK_SECRET:}
+
   demo-data:
     # Opt-in import of the bundled frontend mock dataset. Never overwrites existing rows.
     enabled: ${DEMO_DATA_ENABLED:false}
