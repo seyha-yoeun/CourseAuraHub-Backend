@@ -25,6 +25,7 @@ import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -112,6 +113,11 @@ public class Course {
     @Builder.Default
     private List<CourseMonthlyMetric> monthlyMetrics = new ArrayList<>();
 
+    @OneToMany(mappedBy = "course", fetch = FetchType.LAZY)
+    @BatchSize(size = 50)
+    @Builder.Default
+    private List<CourseDiscount> discounts = new ArrayList<>();
+
     @PrePersist
     void onCreate() {
         LocalDate today = LocalDate.now();
@@ -126,6 +132,19 @@ public class Course {
     @PreUpdate
     void onUpdate() {
         updatedAt = LocalDate.now();
+    }
+
+    /** {@code price} is the regular price; use this for anything a learner sees or pays. */
+    public CoursePrice currentPrice() {
+        Instant now = Instant.now();
+        return discounts.stream()
+                .filter(discount -> discount.isRunningAt(now))
+                .findFirst()
+                .map(discount -> new CoursePrice(
+                        price.subtract(discount.amountOff(price)),
+                        price.max(originalPrice),
+                        discount))
+                .orElseGet(() -> new CoursePrice(price, originalPrice, null));
     }
 
     public void addMonthlyMetric(CourseMonthlyMetric metric) {

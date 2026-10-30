@@ -1,6 +1,7 @@
 package com.course_aura_hub.coupon.model;
 
 import com.course_aura_hub.course.model.Course;
+import com.course_aura_hub.course.model.DiscountType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
