@@ -38,10 +38,9 @@ public class CurriculumController {
     private final CurriculumService curriculumService;
 
     @GetMapping("/curriculum")
-    @PreAuthorize("isAuthenticated()")
     @Operation(
             summary = "Get course curriculum",
-            description = "Sections and lessons in order. Content URLs are returned only for preview lessons, "
+            description = "Public. Sections and lessons in order. Content URLs are returned only for preview lessons, "
                     + "enrolled learners, and admins. Includes the caller's progress when enrolled."
     )
     public ResponseEntity<ApiResponse<CurriculumResponse>> getCurriculum(
@@ -50,7 +49,7 @@ public class CurriculumController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(curriculumService.getCurriculum(
                 slug,
-                authentication.getName(),
+                SecurityUtils.emailOf(authentication),
                 SecurityUtils.isAdmin(authentication)
         )));
     }

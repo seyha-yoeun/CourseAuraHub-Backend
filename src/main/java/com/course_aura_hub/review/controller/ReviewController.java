@@ -31,8 +31,7 @@ public class ReviewController {
     private final ReviewService reviewService;
 
     @GetMapping("/api/v1/courses/{slug}/reviews")
-    @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "List course reviews", description = "Paged, newest first. Reviewer email is never exposed.")
+    @Operation(summary = "List course reviews", description = "Public. Paged, newest first. Reviewer email is never exposed.")
     public ResponseEntity<ApiResponse<ReviewPageResponse>> findByCourse(
             @PathVariable String slug,
             @RequestParam(defaultValue = "0") int page,

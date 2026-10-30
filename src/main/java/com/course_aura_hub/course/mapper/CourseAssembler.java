@@ -23,10 +23,42 @@ public class CourseAssembler {
 
     private final StudentAssembler studentAssembler;
 
+    /** Catalog view for visitors and learners: sales figures are admin-only. */
+    public CourseResponse toPublicResponse(Course course, Boolean enrolled) {
+        CourseResponse full = toResponse(course, null, enrolled);
+        return new CourseResponse(
+                full.id(),
+                full.slug(),
+                full.title(),
+                full.description(),
+                full.instructor(),
+                full.price(),
+                full.originalPrice(),
+                full.status(),
+                full.category(),
+                full.level(),
+                full.thumbnail(),
+                full.rating(),
+                full.totalStudents(),
+                full.totalLessons(),
+                full.totalHours(),
+                null,
+                null,
+                full.tags(),
+                full.createdAt(),
+                full.updatedAt(),
+                null,
+                null,
+                null,
+                enrolled
+        );
+    }
+
     public CourseResponse toResponse(Course course, List<Student> enrolledStudents) {
         return toResponse(course, enrolledStudents, null);
     }
 
+    /** Admin view, with sales metrics. */
     public CourseResponse toResponse(Course course, List<Student> enrolledStudents, Boolean enrolled) {
         Map<Short, CourseMonthlyMetric> metricsByMonth = new LinkedHashMap<>();
         for (CourseMonthlyMetric metric : course.getMonthlyMetrics()) {

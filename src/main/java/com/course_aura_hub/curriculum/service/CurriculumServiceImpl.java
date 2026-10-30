@@ -58,7 +58,9 @@ public class CurriculumServiceImpl implements CurriculumService {
     public CurriculumResponse getCurriculum(String courseSlug, String viewerEmail, boolean admin) {
         Course course = findCourse(courseSlug);
 
-        Optional<StudentCourse> enrollment = learnerAccountService.findCurrentStudent(viewerEmail)
+        // Anonymous visitors have no email, so they can never be enrolled
+        Optional<StudentCourse> enrollment = Optional.ofNullable(viewerEmail)
+                .flatMap(learnerAccountService::findCurrentStudent)
                 .flatMap(student -> studentCourseRepository.findByStudentIdAndCourseId(student.getId(), course.getId()));
         boolean enrolled = enrollment.isPresent();
 

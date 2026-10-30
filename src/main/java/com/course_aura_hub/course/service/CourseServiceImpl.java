@@ -14,7 +14,6 @@ import com.course_aura_hub.course.model.CourseMonthlyMetric;
 import com.course_aura_hub.course.model.CourseStatus;
 import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.course.repository.CourseSpecifications;
-import com.course_aura_hub.student.model.Student;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +62,9 @@ public class CourseServiceImpl implements CourseService {
         List<Course> courses = courseRepository.findAll(specification, resolveSort(criteria));
         log.debug("Fetched {} courses (includeUnpublished={})", courses.size(), includeUnpublished);
         return courses.stream()
-                .map(course -> courseAssembler.toResponse(course, null))
+                .map(course -> includeUnpublished
+                        ? courseAssembler.toResponse(course, null)
+                        : courseAssembler.toPublicResponse(course, null))
                 .toList();
     }
 
@@ -79,10 +80,12 @@ public class CourseServiceImpl implements CourseService {
 
         boolean enrolled = viewerEmail != null && studentCourseRepository.isUserEnrolled(viewerEmail, course.getId());
 
-        // The enrolled-student list contains learner PII (emails, spending) and is admin-only
-        List<Student> enrolledStudents = admin ? studentCourseRepository.findStudentsByCourseId(course.getId()) : null;
         log.debug("Fetched course slug={} admin={} enrolled={}", slug, admin, enrolled);
-        return courseAssembler.toResponse(course, enrolledStudents, enrolled);
+        if (!admin) {
+            return courseAssembler.toPublicResponse(course, enrolled);
+        }
+        // The enrolled-student list contains learner PII (emails, spending) and is admin-only
+        return courseAssembler.toResponse(course, studentCourseRepository.findStudentsByCourseId(course.getId()), enrolled);
     }
 
     @Override
