@@ -11,6 +11,9 @@ This repository is the **REST API** behind the platform. The web app lives in th
 - Browse published courses and view their curriculum, with free-preview lessons
 - Enroll in free courses (paid checkout is on the roadmap)
 - Mark lessons complete; course progress and completion are tracked automatically
+- Pick up where they left off: every enrolled course points to its next unfinished lesson
+- A learning dashboard with time learned, daily streaks, the last week's activity and a course to continue
+- Earn a completion certificate per course, verifiable by anyone at a public URL, plus achievement badges
 - Keep a wishlist, rate and review enrolled courses, and edit their profile and password
 
 **For administrators**
@@ -88,7 +91,8 @@ All responses use the same envelope: `{ success, message, data, errors, timestam
 | `/api/v1/courses` | Read: any user · Write: admin | Course catalog |
 | `/api/v1/courses/{slug}/curriculum` | Any user | Sections and lessons (content URLs only for enrolled learners, previews and admins) |
 | `/api/v1/courses/{slug}/reviews` | Read: any user · Delete: admin | Course reviews |
-| `/api/v1/me/**` | Signed-in user | My courses, enrollment, lesson progress, wishlist, my review, profile, password |
+| `/api/v1/me/**` | Signed-in user | My courses, enrollment, lesson progress, dashboard, achievements, certificates, wishlist, my review, profile, password |
+| `/api/v1/certificates/{number}` | Public | Verify a completion certificate |
 | `/api/v1/students`, `/enrollments`, `/stats`, `/settings` | Admin | Platform management |
 
 See Swagger UI for every endpoint, its request body and its responses.
@@ -101,7 +105,8 @@ Code is organized by feature module under `src/main/java/com/course_aura_hub/`. 
 auth/         users, JWT cookies, OAuth2, lockout, rate limiting, SecurityConfig
 course/       course catalog and monthly metrics
 curriculum/   sections, lessons, lesson progress
-learner/      learner self-service: my courses, enroll, profile, wishlist
+learner/      learner self-service: my courses, enroll, dashboard, achievements, profile, wishlist
+certificate/  course completion certificates and public verification
 review/       ratings and reviews
 student/      admin student management
 enrollment/   admin enrollments (keeps counters and metrics in sync)
@@ -125,10 +130,8 @@ Integration tests start a throwaway PostgreSQL container, so they never touch yo
 ## Roadmap
 
 1. Checkout and payments for paid courses, with order history
-2. Completion certificates with a public verification URL
-3. Password reset and email verification
-4. Public catalog for visitors who aren't signed in
-5. Notifications feed
-6. Lesson Q&A, discussions and personal notes
-7. Categories and instructors as first-class entities
-8. Learning streaks, "continue learning" and recommendations
+2. Public catalog for visitors who aren't signed in
+3. Notifications feed
+4. Lesson Q&A, discussions and personal notes
+5. Categories and instructors as first-class entities
+6. Course recommendations

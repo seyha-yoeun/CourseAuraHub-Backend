@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +24,20 @@ public interface LessonProgressRepository extends JpaRepository<LessonProgress, 
               and lp.lesson.section.course.id = :courseId
             """)
     List<Integer> findCompletedLessonIds(@Param("studentId") Integer studentId, @Param("courseId") Integer courseId);
+
+    @Query("select lp.lesson.id from LessonProgress lp where lp.student.id = :studentId")
+    List<Integer> findAllCompletedLessonIds(@Param("studentId") Integer studentId);
+
+    @Query("select lp.completedAt from LessonProgress lp where lp.student.id = :studentId")
+    List<Instant> findCompletionTimes(@Param("studentId") Integer studentId);
+
+    @Query("""
+            select coalesce(sum(l.durationMinutes), 0)
+            from LessonProgress lp
+            join lp.lesson l
+            where lp.student.id = :studentId
+            """)
+    long sumCompletedMinutes(@Param("studentId") Integer studentId);
 
     @Query("""
             select count(lp)

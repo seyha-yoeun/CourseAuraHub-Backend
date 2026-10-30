@@ -9,6 +9,8 @@ public record CurriculumResponse(
         int totalLessons,
         int totalDurationMinutes,
         CourseProgress progress,
+        // First lesson the enrolled viewer has not completed; null when not enrolled or the course is completed
+        Integer nextLessonId,
         List<SectionResponse> sections
 ) {
 }
