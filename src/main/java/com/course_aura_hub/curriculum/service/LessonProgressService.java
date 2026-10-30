@@ -1,5 +1,6 @@
 package com.course_aura_hub.curriculum.service;
 
+import com.course_aura_hub.curriculum.dto.LessonPositionResponse;
 import com.course_aura_hub.curriculum.dto.LessonProgressResponse;
 import com.course_aura_hub.curriculum.dto.NextLessonResponse;
 import com.course_aura_hub.curriculum.repository.CourseProgressProjection;
@@ -12,6 +13,9 @@ public interface LessonProgressService {
     LessonProgressResponse markComplete(String email, Integer lessonId);
 
     LessonProgressResponse markIncomplete(String email, Integer lessonId);
+
+    /** Remembers where the learner stopped in a video. */
+    LessonPositionResponse savePosition(String email, Integer lessonId, int positionSeconds);
 
     /**
      * Completed-lesson counts and last activity per course for a learner, keyed by course id.

@@ -9,6 +9,8 @@ public record LessonResponse(
         Integer position,
         boolean locked,
         String contentUrl,
-        boolean completed
+        boolean completed,
+        // Where the viewer stopped in this video; null if nothing is saved
+        Integer resumePositionSeconds
 ) {
 }

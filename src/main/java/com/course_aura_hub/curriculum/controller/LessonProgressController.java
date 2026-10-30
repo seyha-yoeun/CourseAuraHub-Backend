@@ -1,10 +1,13 @@
 package com.course_aura_hub.curriculum.controller;
 
 import com.course_aura_hub.common.dto.ApiResponse;
+import com.course_aura_hub.curriculum.dto.LessonPositionRequest;
+import com.course_aura_hub.curriculum.dto.LessonPositionResponse;
 import com.course_aura_hub.curriculum.dto.LessonProgressResponse;
 import com.course_aura_hub.curriculum.service.LessonProgressService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -12,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,6 +41,24 @@ public class LessonProgressController {
                 "Lesson marked complete",
                 lessonProgressService.markComplete(authentication.getName(), lessonId)
         ));
+    }
+
+    @PutMapping("/{lessonId}/position")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(
+            summary = "Save video position",
+            description = "Idempotent. Requires enrollment. Safe to call every few seconds; cleared on completion."
+    )
+    public ResponseEntity<ApiResponse<LessonPositionResponse>> savePosition(
+            @PathVariable Integer lessonId,
+            @Valid @RequestBody LessonPositionRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(lessonProgressService.savePosition(
+                authentication.getName(),
+                lessonId,
+                request.positionSeconds()
+        )));
     }
 
     @DeleteMapping("/{lessonId}/completion")
