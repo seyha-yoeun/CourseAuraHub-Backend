@@ -24,7 +24,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | Module | Purpose | Base path |
 |---|---|---|
 | `auth` | Users, JWT cookies, OAuth2, lockout, rate limiting, `SecurityConfig` | `/api/v1/auth` |
-| `course` | Course catalog (admin CRUD, authenticated read) | `/api/v1/courses` |
+| `course` | Course catalog (admin CRUD, public read) | `/api/v1/courses` |
 | `student` | Admin student management | `/api/v1/students` (ADMIN) |
 | `enrollment` | Admin enrollments; keeps counters + monthly metrics in sync | `/api/v1/enrollments` (ADMIN) |
 | `dashboard` | Admin stats | `/api/v1/stats` (ADMIN) |
@@ -57,8 +57,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 ## Roadmap (not yet built)
 
 1. A real payment provider behind `PaymentGateway`; only the dev-only `fake` gateway exists, so paid checkout is off by default.
-2. Public anonymous catalog (`permitAll` on GET for courses, curriculum outline and reviews).
-3. Notifications feed (enrollment, new lesson, review reply).
-4. Lesson Q&A, discussions and personal notes.
-5. Categories and instructors as real entities, plus instructor profile pages.
-6. Recommendations by tags and category.
+2. Notifications feed (enrollment, new lesson, review reply).
+3. Lesson Q&A, discussions and personal notes.
+4. Categories and instructors as real entities, plus instructor profile pages.
+5. Recommendations by tags and category.

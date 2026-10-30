@@ -38,10 +38,10 @@ public class CourseController {
     private final CourseService courseService;
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
     @Operation(
             summary = "List courses",
-            description = "Clients receive published courses only. Admins can filter by any status."
+            description = "Public. Visitors and learners receive published courses only, without sales figures. "
+                    + "Admins can filter by any status."
     )
     public ResponseEntity<ApiResponse<List<CourseResponse>>> findAll(
             @RequestParam(required = false) String status,
@@ -57,18 +57,17 @@ public class CourseController {
     }
 
     @GetMapping("/{slug}")
-    @PreAuthorize("isAuthenticated()")
     @Operation(
             summary = "Get course",
-            description = "Returns a course with its monthly metrics and whether the caller is enrolled. "
-                    + "Admins also receive the enrolled-student list. Clients can only see published courses."
+            description = "Public. Returns a published course and whether the caller is enrolled. "
+                    + "Admins can see any status and also receive sales metrics and the enrolled-student list."
     )
     public ResponseEntity<ApiResponse<CourseResponse>> findBySlug(
             @PathVariable String slug,
             Authentication authentication
     ) {
         boolean admin = SecurityUtils.isAdmin(authentication);
-        return ResponseEntity.ok(ApiResponse.success(courseService.findBySlug(slug, admin, authentication.getName())));
+        return ResponseEntity.ok(ApiResponse.success(courseService.findBySlug(slug, admin, SecurityUtils.emailOf(authentication))));
     }
 
     @PostMapping
