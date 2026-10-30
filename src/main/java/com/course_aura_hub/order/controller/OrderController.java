@@ -44,7 +44,7 @@ public class OrderController {
             Authentication authentication
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-                checkoutFacade.checkout(authentication.getName(), request.courseSlug())
+                checkoutFacade.checkout(authentication.getName(), request.courseSlug(), request.couponCode())
         ));
     }
 

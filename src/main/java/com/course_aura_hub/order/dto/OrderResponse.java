@@ -8,6 +8,11 @@ public record OrderResponse(
         String courseSlug,
         String courseTitle,
         String thumbnail,
+        // Price before any coupon
+        BigDecimal listAmount,
+        BigDecimal discountAmount,
+        String couponCode,
+        // What the learner pays
         BigDecimal amount,
         String currency,
         String status,
