@@ -3,6 +3,7 @@ package com.course_aura_hub.learner.service;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.course.model.Course;
+import com.course_aura_hub.course.model.CoursePrice;
 import com.course_aura_hub.course.model.CourseStatus;
 import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.learner.dto.WishlistItemResponse;
@@ -81,6 +82,7 @@ public class WishlistServiceImpl implements WishlistService {
 
     private WishlistItemResponse toResponse(WishlistItem item) {
         Course course = item.getCourse();
+        CoursePrice current = course.currentPrice();
         return new WishlistItemResponse(
                 course.getId(),
                 course.getSlug(),
@@ -88,8 +90,8 @@ public class WishlistServiceImpl implements WishlistService {
                 course.getThumbnail(),
                 course.getInstructor(),
                 course.getLevel().apiValue(),
-                course.getPrice(),
-                course.getOriginalPrice(),
+                current.price(),
+                current.originalPrice(),
                 course.getRating(),
                 item.getCreatedAt()
         );
