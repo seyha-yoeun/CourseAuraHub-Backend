@@ -84,7 +84,7 @@ public class SecurityConfig {
                         .csrfTokenRequestHandler(csrfTokenHandler)
                         .ignoringRequestMatchers(PUBLIC_AUTH_ENDPOINTS)
                         .ignoringRequestMatchers("/oauth2/**", "/login/oauth2/**")
-                        .ignoringRequestMatchers("/api/v1/payments/webhooks/*")
+                        .ignoringRequestMatchers("/api/v1/payments/webhooks/*", "/api/v1/telegram/webhook")
                         .ignoringRequestMatchers(bearerOnlyRequest())
                 )
                 .cors(Customizer.withDefaults())
@@ -107,6 +107,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/certificates/*").permitAll()
                         // Payment provider webhooks, authenticated by signature in the gateway
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhooks/*").permitAll()
+                        // Telegram webhook, authenticated by its secret header in the controller
+                        .requestMatchers(HttpMethod.POST, "/api/v1/telegram/webhook").permitAll()
                         // Account administration
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // Client-safe platform branding
