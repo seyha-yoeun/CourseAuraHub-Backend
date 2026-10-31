@@ -46,6 +46,8 @@ public class TelegramMessages {
             case "payment_failed" -> "⚠️";
             case "order_refunded" -> "💸";
             case "new_enrollment" -> "🧑‍🎓";
+            case "course_completed" -> "🎉";
+            case "weekly_report" -> "📊";
             default -> "🔔";
         };
     }

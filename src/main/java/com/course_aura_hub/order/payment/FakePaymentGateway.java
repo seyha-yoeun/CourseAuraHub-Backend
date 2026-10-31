@@ -53,6 +53,12 @@ public class FakePaymentGateway implements PaymentGateway {
     }
 
     @Override
+    public PaymentSession createGroupPayment(String groupNumber, BigDecimal amount, String currency) {
+        String reference = "fake_" + UUID.randomUUID();
+        return new PaymentSession(reference, "https://payments.invalid/checkout/" + reference);
+    }
+
+    @Override
     public PaymentEvent parseWebhook(String signature, String payload) {
         byte[] expected = sign(payload).getBytes(StandardCharsets.UTF_8);
         byte[] actual = (signature == null ? "" : signature).getBytes(StandardCharsets.UTF_8);

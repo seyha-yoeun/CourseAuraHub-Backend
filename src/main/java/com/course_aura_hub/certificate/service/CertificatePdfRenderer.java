@@ -22,6 +22,7 @@ import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.springframework.stereotype.Component;
 
 import java.awt.Color;
+import java.awt.geom.PathIterator;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -59,12 +60,58 @@ public class CertificatePdfRenderer {
     private static final DateTimeFormatter DATE =
             DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.ENGLISH).withZone(ZoneOffset.UTC);
 
+    private static final String[] KHMER_MONTHS = {
+            "មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា", "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"
+    };
+
+    private record Wording(
+            String heading,
+            String certifies,
+            String completed,
+            String instructor,
+            String date,
+            String scan,
+            String certificateId,
+            String verifyAt
+    ) {
+    }
+
+    private static final Wording ENGLISH = new Wording(
+            "CERTIFICATE OF COMPLETION",
+            "This is to certify that",
+            "has successfully completed every lesson of the course",
+            "COURSE INSTRUCTOR",
+            "DATE OF COMPLETION",
+            "SCAN TO VERIFY",
+            "Certificate ID  ",
+            "Verify this certificate at "
+    );
+
+    private static final Wording KHMER = new Wording(
+            "វិញ្ញាបនបត្របញ្ចប់វគ្គសិក្សា",
+            "សូមបញ្ជាក់ថា",
+            "បានបញ្ចប់គ្រប់មេរៀនទាំងអស់នៃវគ្គសិក្សា",
+            "គ្រូបង្រៀន",
+            "កាលបរិច្ឆេទបញ្ចប់",
+            "ស្កេនដើម្បីផ្ទៀងផ្ទាត់",
+            "លេខវិញ្ញាបនបត្រ  ",
+            "ផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រនេះនៅ "
+    );
+
     private final CertificateProperties properties;
+    private final CertificateTextOutliner outliner;
+
+    public byte[] render(CourseCertificate certificate) {
+        return render(certificate, "en");
+    }
 
     /**
-     * @throws BusinessRuleException when a name or title uses a script the embedded fonts cannot draw
+     * @param language {@code km} for Khmer wording, anything else for English
+     * @throws BusinessRuleException when a name or title uses a script the bundled fonts cannot draw
      */
-    public byte[] render(CourseCertificate certificate) {
+    public byte[] render(CourseCertificate certificate, String language) {
+        boolean khmer = "km".equalsIgnoreCase(language);
+        Wording wording = khmer ? KHMER : ENGLISH;
         try (PDDocument document = new PDDocument()) {
             PDPage page = new PDPage(new PDRectangle(WIDTH, HEIGHT));
             document.addPage(page);
@@ -76,9 +123,9 @@ public class CertificatePdfRenderer {
             try (PDPageContentStream content = new PDPageContentStream(document, page)) {
                 drawFrame(content);
                 drawBrand(content);
-                drawHeading(content);
-                drawBody(document, content, certificate);
-                drawFooter(document, content, certificate);
+                drawHeading(document, content, wording);
+                drawBody(document, content, certificate, wording);
+                drawFooter(document, content, certificate, wording, khmer);
             }
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -123,11 +170,11 @@ public class CertificatePdfRenderer {
         drawPolygon(content, CENTER, y, new float[]{radius * 0.5f}, 6, (float) (Math.PI / 2));
         content.fill();
 
-        drawCentered(content, "COURSEAURAHUB ACADEMY", SANS_BOLD, 8.5f, 2.6f, NAVY, CENTER, 503);
+        drawCentered(null, content, "COURSEAURAHUB ACADEMY", SANS_BOLD, 8.5f, 2.6f, NAVY, CENTER, 503);
     }
 
-    private void drawHeading(PDPageContentStream content) throws IOException {
-        drawCentered(content, "CERTIFICATE OF COMPLETION", SERIF_BOLD, 28, 2.5f, NAVY, CENTER, 459);
+    private void drawHeading(PDDocument document, PDPageContentStream content, Wording wording) throws IOException {
+        drawCentered(document, content, wording.heading(), SERIF_BOLD, 28, 2.5f, NAVY, CENTER, 459);
 
         content.setStrokingColor(GOLD);
         content.setLineWidth(1);
@@ -141,12 +188,11 @@ public class CertificatePdfRenderer {
         content.fill();
     }
 
-    private void drawBody(PDDocument document, PDPageContentStream content, CourseCertificate certificate) throws IOException {
-        drawCentered(content, "This is to certify that", SERIF_ITALIC, 13, 0, MUTED, CENTER, 412);
+    private void drawBody(PDDocument document, PDPageContentStream content, CourseCertificate certificate, Wording wording) throws IOException {
+        drawCentered(document, content, wording.certifies(), SERIF_ITALIC, 13, 0, MUTED, CENTER, 412);
 
         String name = singleLine(certificate.getLearnerName());
-        PDFont nameFont = fontFor(document, SERIF_BOLD, name);
-        drawCentered(content, name, nameFont, fitSize(name, nameFont, 38, 18, 640), 0, NAVY, CENTER, 366);
+        drawCentered(document, content, name, SERIF_BOLD, fitSize(document, name, SERIF_BOLD, 38, 18, 640), 0, NAVY, CENTER, 366);
 
         content.setStrokingColor(GOLD);
         content.setLineWidth(0.75f);
@@ -154,49 +200,68 @@ public class CertificatePdfRenderer {
         content.lineTo(CENTER + 210, 354);
         content.stroke();
 
-        drawCentered(content, "has successfully completed every lesson of the course", SERIF_ITALIC, 13, 0, MUTED, CENTER, 330);
+        drawCentered(document, content, wording.completed(), SERIF_ITALIC, 13, 0, MUTED, CENTER, 330);
 
         String title = singleLine(certificate.getCourseTitle());
-        PDFont titleFont = fontFor(document, SERIF_BOLD, title);
         float size = 22;
-        List<String> lines = wrap(title, titleFont, size, 620);
+        List<String> lines = wrap(document, title, SERIF_BOLD, size, 620);
         while (lines.size() > 2 && size > 12) {
             size -= 1;
-            lines = wrap(title, titleFont, size, 620);
+            lines = wrap(document, title, SERIF_BOLD, size, 620);
         }
         if (lines.size() > 2) {
             lines = List.of(lines.get(0), lines.get(1) + "...");
         }
         float y = lines.size() == 1 ? 293 : 298;
         for (String line : lines) {
-            drawCentered(content, line, titleFont, size, 0, NAVY, CENTER, y);
+            drawCentered(document, content, line, SERIF_BOLD, size, 0, NAVY, CENTER, y);
             y -= size + 6;
         }
     }
 
-    private void drawFooter(PDDocument document, PDPageContentStream content, CourseCertificate certificate) throws IOException {
-        String instructor = singleLine(certificate.getInstructor());
-        PDFont instructorFont = fontFor(document, SERIF_BOLD, instructor);
-        drawSignatory(content, instructor, instructorFont, "COURSE INSTRUCTOR", 175);
-        drawSignatory(content, DATE.format(certificate.getIssuedAt()), SERIF_BOLD, "DATE OF COMPLETION", 595);
+    private void drawFooter(
+            PDDocument document,
+            PDPageContentStream content,
+            CourseCertificate certificate,
+            Wording wording,
+            boolean khmer
+    ) throws IOException {
+        drawSignatory(document, content, singleLine(certificate.getInstructor()), wording.instructor(), 175);
+        drawSignatory(document, content, completionDate(certificate, khmer), wording.date(), 595);
         drawSeal(content, CENTER, 136);
 
         String url = verificationUrl(certificate);
         drawQrCode(content, url, 704, 118, 64);
-        drawCentered(content, "SCAN TO VERIFY", SANS_BOLD, 5.5f, 0.8f, MUTED, 736, 108);
+        drawCentered(document, content, wording.scan(), SANS_BOLD, 5.5f, 0.8f, MUTED, 736, 108);
 
-        drawCentered(content, "Certificate ID  " + certificate.getCertificateNumber(), SERIF_BOLD, 9.5f, 0.3f, NAVY, CENTER, 62);
-        drawCentered(content, "Verify this certificate at " + url, SERIF, 8.5f, 0, MUTED, CENTER, 49);
+        drawCentered(document, content, wording.certificateId() + certificate.getCertificateNumber(), SERIF_BOLD, 9.5f, 0.3f, NAVY, CENTER, 62);
+        drawCentered(document, content, wording.verifyAt() + url, SERIF, 8.5f, 0, MUTED, CENTER, 49);
     }
 
-    private void drawSignatory(PDPageContentStream content, String value, PDFont font, String label, float x) throws IOException {
-        drawCentered(content, value, font, fitSize(value, font, 13, 8, 180), 0, NAVY, x, 134);
+    private void drawSignatory(PDDocument document, PDPageContentStream content, String value, String label, float x) throws IOException {
+        drawCentered(document, content, value, SERIF_BOLD, fitSize(document, value, SERIF_BOLD, 13, 8, 180), 0, NAVY, x, 134);
         content.setStrokingColor(NAVY);
         content.setLineWidth(0.6f);
         content.moveTo(x - 92, 126);
         content.lineTo(x + 92, 126);
         content.stroke();
-        drawCentered(content, label, SANS_BOLD, 6.5f, 1, MUTED, x, 114);
+        drawCentered(document, content, label, SANS_BOLD, 6.5f, 1, MUTED, x, 114);
+    }
+
+    private String completionDate(CourseCertificate certificate, boolean khmer) {
+        if (!khmer) {
+            return DATE.format(certificate.getIssuedAt());
+        }
+        var date = certificate.getIssuedAt().atZone(ZoneOffset.UTC).toLocalDate();
+        return "ថ្ងៃទី" + khmerDigits(date.getDayOfMonth())
+                + " ខែ" + KHMER_MONTHS[date.getMonthValue() - 1]
+                + " ឆ្នាំ" + khmerDigits(date.getYear());
+    }
+
+    private String khmerDigits(int number) {
+        StringBuilder digits = new StringBuilder();
+        String.valueOf(number).chars().forEach(digit -> digits.append((char) (0x17E0 + digit - '0')));
+        return digits.toString();
     }
 
     private void drawSeal(PDPageContentStream content, float x, float y) throws IOException {
@@ -254,17 +319,25 @@ public class CertificatePdfRenderer {
         content.closePath();
     }
 
+    /** Draws with a real PDF font when one covers the text, otherwise as shaped outlines. */
     private void drawCentered(
+            PDDocument document,
             PDPageContentStream content,
             String text,
-            PDFont font,
+            PDFont preferred,
             float size,
             float spacing,
             Color color,
             float x,
             float y
     ) throws IOException {
-        float width = textWidth(text, font, size) + spacing * (text.length() - 1);
+        PDFont font = fontFor(document, preferred, text);
+        if (font == null) {
+            drawOutline(content, outline(text, preferred, size), color, x, y);
+            return;
+        }
+
+        float width = font.getStringWidth(text) / 1000 * size + spacing * (text.length() - 1);
         content.beginText();
         content.setFont(font, size);
         content.setCharacterSpacing(spacing);
@@ -274,10 +347,62 @@ public class CertificatePdfRenderer {
         content.endText();
     }
 
+    private void drawOutline(PDPageContentStream content, CertificateTextOutliner.Outline outline, Color color, float x, float y) throws IOException {
+        float left = x - outline.width() / 2;
+        float[] point = new float[6];
+        float lastX = 0;
+        float lastY = 0;
+
+        content.setNonStrokingColor(color);
+        for (PathIterator path = outline.shape().getPathIterator(null); !path.isDone(); path.next()) {
+            int type = path.currentSegment(point);
+            // Java's y axis points down and PDF's up
+            switch (type) {
+                case PathIterator.SEG_MOVETO -> {
+                    content.moveTo(left + point[0], y - point[1]);
+                    lastX = point[0];
+                    lastY = point[1];
+                }
+                case PathIterator.SEG_LINETO -> {
+                    content.lineTo(left + point[0], y - point[1]);
+                    lastX = point[0];
+                    lastY = point[1];
+                }
+                case PathIterator.SEG_QUADTO -> {
+                    // PDF has only cubic curves, so the quadratic is raised to an equivalent one
+                    float x1 = lastX + 2f / 3 * (point[0] - lastX);
+                    float y1 = lastY + 2f / 3 * (point[1] - lastY);
+                    float x2 = point[2] + 2f / 3 * (point[0] - point[2]);
+                    float y2 = point[3] + 2f / 3 * (point[1] - point[3]);
+                    content.curveTo(left + x1, y - y1, left + x2, y - y2, left + point[2], y - point[3]);
+                    lastX = point[2];
+                    lastY = point[3];
+                }
+                case PathIterator.SEG_CUBICTO -> {
+                    content.curveTo(left + point[0], y - point[1], left + point[2], y - point[3], left + point[4], y - point[5]);
+                    lastX = point[4];
+                    lastY = point[5];
+                }
+                default -> content.closePath();
+            }
+        }
+        content.fill();
+    }
+
+    private CertificateTextOutliner.Outline outline(String text, PDFont preferred, float size) {
+        CertificateTextOutliner.Outline outline = outliner.outline(text, size, preferred == SERIF_BOLD || preferred == SANS_BOLD);
+        if (outline == null) {
+            throw new BusinessRuleException(
+                    "This certificate uses characters the PDF can't show yet. Use Print on the certificate page instead.");
+        }
+        return outline;
+    }
+
     private String verificationUrl(CourseCertificate certificate) {
         return properties.verifyUrl().replaceAll("/+$", "") + "/" + certificate.getCertificateNumber();
     }
 
+    /** @return a PDF font that covers the text, or null when it needs outlines */
     private PDFont fontFor(PDDocument document, PDFont preferred, String text) throws IOException {
         if (canDraw(preferred, text)) {
             return preferred;
@@ -287,12 +412,8 @@ public class CertificatePdfRenderer {
                 throw new IllegalStateException("Missing bundled font " + UNICODE_FONT);
             }
             PDFont unicode = PDType0Font.load(document, font);
-            if (canDraw(unicode, text)) {
-                return unicode;
-            }
+            return canDraw(unicode, text) ? unicode : null;
         }
-        throw new BusinessRuleException(
-                "This certificate uses characters the PDF can't show yet. Use Print on the certificate page instead.");
     }
 
     private boolean canDraw(PDFont font, String text) throws IOException {
@@ -304,20 +425,20 @@ public class CertificatePdfRenderer {
         }
     }
 
-    private float fitSize(String text, PDFont font, float largest, float smallest, float maxWidth) throws IOException {
+    private float fitSize(PDDocument document, String text, PDFont font, float largest, float smallest, float maxWidth) throws IOException {
         float size = largest;
-        while (size > smallest && textWidth(text, font, size) > maxWidth) {
+        while (size > smallest && textWidth(document, text, font, size) > maxWidth) {
             size -= 1;
         }
         return size;
     }
 
-    private List<String> wrap(String text, PDFont font, float size, float maxWidth) throws IOException {
+    private List<String> wrap(PDDocument document, String text, PDFont font, float size, float maxWidth) throws IOException {
         List<String> lines = new ArrayList<>();
         StringBuilder line = new StringBuilder();
         for (String word : text.split(" ")) {
             String candidate = line.isEmpty() ? word : line + " " + word;
-            if (!line.isEmpty() && textWidth(candidate, font, size) > maxWidth) {
+            if (!line.isEmpty() && textWidth(document, candidate, font, size) > maxWidth) {
                 lines.add(line.toString());
                 line = new StringBuilder(word);
             } else {
@@ -328,8 +449,9 @@ public class CertificatePdfRenderer {
         return lines;
     }
 
-    private float textWidth(String text, PDFont font, float size) throws IOException {
-        return font.getStringWidth(text) / 1000 * size;
+    private float textWidth(PDDocument document, String text, PDFont preferred, float size) throws IOException {
+        PDFont font = fontFor(document, preferred, text);
+        return font == null ? outline(text, preferred, size).width() : font.getStringWidth(text) / 1000 * size;
     }
 
     private String singleLine(String text) {

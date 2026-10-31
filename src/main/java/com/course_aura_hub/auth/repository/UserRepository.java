@@ -26,6 +26,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("select u.id from User u where u.role = :role and u.enabled = true")
     List<UUID> findEnabledIdsByRole(@Param("role") Role role);
 
+    @Query("select u.email from User u where u.role = :role and u.enabled = true")
+    List<String> findEnabledEmailsByRole(@Param("role") Role role);
+
     /**
      * Row-locks the user for the rest of the transaction. Every flow that mutates credentials,
      * one-time tokens or sessions for a user locks the user row first, which serializes concurrent

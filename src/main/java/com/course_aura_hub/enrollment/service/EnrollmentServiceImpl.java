@@ -1,5 +1,6 @@
 package com.course_aura_hub.enrollment.service;
 
+import com.course_aura_hub.cart.repository.CartItemRepository;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.DuplicateResourceException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
@@ -44,6 +45,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final EnrollmentAssembler enrollmentAssembler;
     private final NotificationService notificationService;
     private final SettingsService settingsService;
+    private final CartItemRepository cartItemRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -100,6 +102,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         student.setLastActive(LocalDate.now());
 
         incrementMonthlyMetric(course, enrolledAt, amount);
+        cartItemRepository.deleteByStudentIdAndCourseId(student.getId(), course.getId());
 
         notificationService.notifyStudent(
                 student.getId(),

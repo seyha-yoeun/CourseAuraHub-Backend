@@ -10,6 +10,7 @@ import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.notification.model.NotificationType;
 import com.course_aura_hub.notification.service.NotificationService;
+import com.course_aura_hub.settings.service.SettingsService;
 import com.course_aura_hub.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class CertificateServiceImpl implements CertificateService {
     private final StudentRepository studentRepository;
     private final NotificationService notificationService;
     private final CertificatePdfRenderer pdfRenderer;
+    private final SettingsService settingsService;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -76,6 +78,14 @@ public class CertificateServiceImpl implements CertificateService {
                     "You completed " + course.getTitle() + ". Your certificate is ready.",
                     "/certificates/" + number
             );
+            if (settingsService.isCourseCompletionAlertEnabled()) {
+                notificationService.notifyAdmins(
+                        NotificationType.COURSE_COMPLETED,
+                        "Course completed",
+                        learnerName + " completed " + course.getTitle() + ".",
+                        "/courses/" + course.getSlug()
+                );
+            }
         }
         return issued;
     }
@@ -101,12 +111,12 @@ public class CertificateServiceImpl implements CertificateService {
 
     @Override
     @Transactional(readOnly = true)
-    public byte[] renderPdf(String email, String certificateNumber) {
+    public byte[] renderPdf(String email, String certificateNumber, String language) {
         return learnerAccountService.findCurrentStudent(email)
                 .flatMap(student -> Optional.ofNullable(CertificateNumberGenerator.normalize(certificateNumber))
                         .flatMap(certificateRepository::findByCertificateNumber)
                         .filter(certificate -> certificate.getStudent().getId().equals(student.getId())))
-                .map(pdfRenderer::render)
+                .map(certificate -> pdfRenderer.render(certificate, language))
                 .orElseThrow(() -> new ResourceNotFoundException("Certificate not found"));
     }
 }

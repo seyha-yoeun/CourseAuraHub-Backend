@@ -53,4 +53,9 @@ public class Lesson {
 
     @Column(name = "position", nullable = false)
     private Integer position;
+
+    // Score needed to pass, when this is a quiz with questions
+    @Builder.Default
+    @Column(name = "quiz_pass_percent", nullable = false)
+    private Integer quizPassPercent = 70;
 }

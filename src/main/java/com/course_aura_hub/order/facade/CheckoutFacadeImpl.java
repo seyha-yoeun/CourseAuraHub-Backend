@@ -1,10 +1,12 @@
 package com.course_aura_hub.order.facade;
 
+import com.course_aura_hub.cart.dto.CheckoutResponse;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.common.exception.ServiceUnavailableException;
 import com.course_aura_hub.order.config.PaymentProperties;
 import com.course_aura_hub.order.dto.OrderResponse;
 import com.course_aura_hub.order.model.Order;
+import com.course_aura_hub.order.model.OrderGroup;
 import com.course_aura_hub.order.payment.PaymentGateway;
 import com.course_aura_hub.order.payment.PaymentSession;
 import com.course_aura_hub.order.service.OrderService;
@@ -51,6 +53,30 @@ public class CheckoutFacadeImpl implements CheckoutFacade {
             throw new ServiceUnavailableException("Payment could not be started. Please try again.", ex);
         }
         return orderService.attachSession(order.getOrderNumber(), session);
+    }
+
+    @Override
+    public CheckoutResponse checkoutCart(String email, String couponCode) {
+        PaymentGateway gateway = paymentGateway.getIfAvailable();
+        OrderGroup group = orderService.openGroup(
+                email,
+                couponCode,
+                paymentProperties.currency(),
+                gateway == null ? null : gateway.name()
+        );
+        if (group.getAmount().signum() == 0) {
+            return orderService.completeFreeGroup(group.getGroupNumber());
+        }
+
+        PaymentSession session;
+        try {
+            session = gateway.createGroupPayment(group.getGroupNumber(), group.getAmount(), group.getCurrency());
+        } catch (RuntimeException ex) {
+            log.error("Payment provider failed for group={}", group.getGroupNumber(), ex);
+            orderService.markGroupFailed(group.getGroupNumber());
+            throw new ServiceUnavailableException("Payment could not be started. Please try again.", ex);
+        }
+        return orderService.attachGroupSession(group.getGroupNumber(), session);
     }
 
     @Override

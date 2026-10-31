@@ -27,6 +27,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -104,6 +105,17 @@ public class CouponServiceImpl implements CouponService {
         }
         log.info("Updated coupon id={}", id);
         return toResponse(coupon);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Course chooseCourse(String code, List<Course> courses) {
+        Coupon coupon = couponRepository.findByCode(normalize(code))
+                .orElseThrow(() -> new BusinessRuleException(INVALID_COUPON));
+        return courses.stream()
+                .filter(course -> coupon.getCourse() == null || coupon.getCourse().getId().equals(course.getId()))
+                .max(Comparator.comparing(course -> course.currentPrice().price()))
+                .orElseThrow(() -> new BusinessRuleException(INVALID_COUPON));
     }
 
     @Override

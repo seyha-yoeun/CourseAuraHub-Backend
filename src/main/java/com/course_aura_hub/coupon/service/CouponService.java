@@ -17,6 +17,14 @@ public interface CouponService {
 
     CouponResponse update(Integer id, CouponUpdateRequest request);
 
+    /**
+     * The course in a cart a code applies to. A code is used once per learner, so it discounts one course:
+     * the one it is limited to, otherwise the most expensive.
+     *
+     * @throws com.course_aura_hub.common.exception.BusinessRuleException when the code can't apply to this cart
+     */
+    Course chooseCourse(String code, List<Course> courses);
+
     CouponPreviewResponse preview(String email, CouponPreviewRequest request);
 
     /**
