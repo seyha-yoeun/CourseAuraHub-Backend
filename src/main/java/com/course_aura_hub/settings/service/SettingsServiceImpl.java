@@ -60,6 +60,14 @@ public class SettingsServiceImpl implements SettingsService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public boolean isNewEnrollmentAlertEnabled() {
+        PlatformSettings settings = platformSettingsRepository.findById(SETTINGS_ID)
+                .orElseGet(this::defaultSettings);
+        return Boolean.TRUE.equals(settings.getNotifications().get("newEnrollment"));
+    }
+
+    @Override
     @Transactional
     public PlatformSettingsResponse updateSettings(String email, SettingsUpdateRequest request) {
         User user = getUser(email);

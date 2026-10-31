@@ -119,6 +119,12 @@ app:
     refresh-token-max-age: ${COOKIE_REFRESH_TOKEN_MAX_AGE:604800}
     http-only: ${COOKIE_HTTP_ONLY:true}
 
+  notifications:
+    # Streams close after this long; clients reconnect, which re-checks their session
+    stream-timeout: ${NOTIFICATION_STREAM_TIMEOUT:15m}
+    heartbeat-interval: ${NOTIFICATION_HEARTBEAT_INTERVAL:PT25S}
+    max-streams-per-user: ${NOTIFICATION_MAX_STREAMS_PER_USER:5}
+
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
     # Upper bound on tracked client/endpoint buckets (LRU eviction)

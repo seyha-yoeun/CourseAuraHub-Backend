@@ -10,5 +10,7 @@ public interface SettingsService {
 
     PublicSettingsResponse getPublicSettings();
 
+    boolean isNewEnrollmentAlertEnabled();
+
     PlatformSettingsResponse updateSettings(String email, SettingsUpdateRequest request);
 }

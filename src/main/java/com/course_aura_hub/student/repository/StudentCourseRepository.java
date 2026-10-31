@@ -30,6 +30,9 @@ public interface StudentCourseRepository extends JpaRepository<StudentCourse, St
             """)
     List<Student> findStudentsByCourseId(@Param("courseId") Integer courseId);
 
+    @Query("select sc.student.id from StudentCourse sc where sc.course.id = :courseId")
+    List<Integer> findStudentIdsByCourseId(@Param("courseId") Integer courseId);
+
     Optional<StudentCourse> findByStudentIdAndCourseId(Integer studentId, Integer courseId);
 
     boolean existsByStudentIdAndCourseId(Integer studentId, Integer courseId);
