@@ -98,6 +98,18 @@ app:
     currency: ${PAYMENT_CURRENCY:USD}
     webhook-secret: ${PAYMENT_WEBHOOK_SECRET:}
 
+  storage:
+    # S3-compatible storage. Defaults match the MinIO in docker-compose; a blank endpoint turns uploads off.
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
+    # Address browsers use, when it differs from the endpoint above
+    public-endpoint: ${STORAGE_PUBLIC_ENDPOINT:}
+    # Base URL for public files, such as a CDN in front of the bucket
+    public-url: ${STORAGE_PUBLIC_URL:}
+    region: ${STORAGE_REGION:us-east-1}
+    bucket: ${STORAGE_BUCKET:course-aura}
+    access-key: ${STORAGE_ACCESS_KEY:minioadmin}
+    secret-key: ${STORAGE_SECRET_KEY:minioadmin}
+
   certificates:
     # Frontend verification page. Printed on certificates, so it must be the public production URL.
     verify-url: ${CERTIFICATE_VERIFY_URL:http://localhost:3000/certificates}
