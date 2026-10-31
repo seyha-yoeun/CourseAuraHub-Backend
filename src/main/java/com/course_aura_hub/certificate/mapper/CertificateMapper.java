@@ -10,13 +10,8 @@ import org.mapstruct.Mapping;
 public interface CertificateMapper {
 
     @Mapping(target = "courseSlug", source = "course.slug")
-    @Mapping(target = "courseTitle", source = "course.title")
-    @Mapping(target = "instructor", source = "course.instructor")
     @Mapping(target = "thumbnail", source = "course.thumbnail")
     CertificateResponse toResponse(CourseCertificate certificate);
 
-    @Mapping(target = "learnerName", source = "student.name")
-    @Mapping(target = "courseTitle", source = "course.title")
-    @Mapping(target = "instructor", source = "course.instructor")
     CertificateVerificationResponse toVerificationResponse(CourseCertificate certificate);
 }

@@ -35,4 +35,9 @@ public interface CertificateService {
      * Public verification lookup by certificate number (case-insensitive).
      */
     CertificateVerificationResponse verify(String certificateNumber);
+
+    /**
+     * The certificate as a printable PDF, for the learner who earned it. Anyone else's reads as missing.
+     */
+    byte[] renderPdf(String email, String certificateNumber);
 }
