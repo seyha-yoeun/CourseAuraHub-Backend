@@ -31,14 +31,18 @@ public interface CourseCertificateRepository extends JpaRepository<CourseCertifi
      */
     @Modifying
     @Query(value = """
-            INSERT INTO course_certificates (certificate_number, student_id, course_id, issued_at)
-            VALUES (:certificateNumber, :studentId, :courseId, now())
+            INSERT INTO course_certificates
+                (certificate_number, student_id, course_id, learner_name, course_title, instructor, issued_at)
+            VALUES (:certificateNumber, :studentId, :courseId, :learnerName, :courseTitle, :instructor, now())
             ON CONFLICT (student_id, course_id) DO NOTHING
             """, nativeQuery = true)
     int insertIfAbsent(
             @Param("certificateNumber") String certificateNumber,
             @Param("studentId") Integer studentId,
-            @Param("courseId") Integer courseId
+            @Param("courseId") Integer courseId,
+            @Param("learnerName") String learnerName,
+            @Param("courseTitle") String courseTitle,
+            @Param("instructor") String instructor
     );
 
     /** Learners marked as having completed the course who have not been issued a certificate yet. */

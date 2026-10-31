@@ -7,7 +7,8 @@ package com.course_aura_hub.auth.model;
 public enum TokenPurpose {
     EMAIL_VERIFICATION(true),
     PASSWORD_RESET(false),
-    MFA_LOGIN_CHALLENGE(false);
+    MFA_LOGIN_CHALLENGE(false),
+    TELEGRAM_LINK(false);
 
     private final boolean numeric;
 
