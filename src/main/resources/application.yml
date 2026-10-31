@@ -98,6 +98,10 @@ app:
     currency: ${PAYMENT_CURRENCY:USD}
     webhook-secret: ${PAYMENT_WEBHOOK_SECRET:}
 
+  certificates:
+    # Frontend verification page. Printed on certificates, so it must be the public production URL.
+    verify-url: ${CERTIFICATE_VERIFY_URL:http://localhost:3000/certificates}
+
   demo-data:
     # Opt-in import of the bundled frontend mock dataset. Never overwrites existing rows.
     enabled: ${DEMO_DATA_ENABLED:false}

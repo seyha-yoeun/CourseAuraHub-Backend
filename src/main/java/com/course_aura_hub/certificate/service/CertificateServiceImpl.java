@@ -5,10 +5,12 @@ import com.course_aura_hub.certificate.dto.CertificateVerificationResponse;
 import com.course_aura_hub.certificate.mapper.CertificateMapper;
 import com.course_aura_hub.certificate.repository.CourseCertificateRepository;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
+import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.notification.model.NotificationType;
 import com.course_aura_hub.notification.service.NotificationService;
+import com.course_aura_hub.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,9 @@ public class CertificateServiceImpl implements CertificateService {
     private final CertificateMapper certificateMapper;
     private final LearnerAccountService learnerAccountService;
     private final CourseRepository courseRepository;
+    private final StudentRepository studentRepository;
     private final NotificationService notificationService;
+    private final CertificatePdfRenderer pdfRenderer;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -60,14 +64,16 @@ public class CertificateServiceImpl implements CertificateService {
 
     private boolean issue(Integer studentId, Integer courseId) {
         String number = numberGenerator.next();
-        boolean issued = certificateRepository.insertIfAbsent(number, studentId, courseId) > 0;
+        Course course = courseRepository.findById(courseId).orElseThrow();
+        String learnerName = studentRepository.findById(studentId).orElseThrow().getName();
+        boolean issued = certificateRepository.insertIfAbsent(
+                number, studentId, courseId, learnerName, course.getTitle(), course.getInstructor()) > 0;
         if (issued) {
-            String courseTitle = courseRepository.findById(courseId).orElseThrow().getTitle();
             notificationService.notifyStudent(
                     studentId,
                     NotificationType.CERTIFICATE_ISSUED,
                     "Certificate earned",
-                    "You completed " + courseTitle + ". Your certificate is ready.",
+                    "You completed " + course.getTitle() + ". Your certificate is ready.",
                     "/certificates/" + number
             );
         }
@@ -90,6 +96,17 @@ public class CertificateServiceImpl implements CertificateService {
         return Optional.ofNullable(CertificateNumberGenerator.normalize(certificateNumber))
                 .flatMap(certificateRepository::findByCertificateNumber)
                 .map(certificateMapper::toVerificationResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Certificate not found"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] renderPdf(String email, String certificateNumber) {
+        return learnerAccountService.findCurrentStudent(email)
+                .flatMap(student -> Optional.ofNullable(CertificateNumberGenerator.normalize(certificateNumber))
+                        .flatMap(certificateRepository::findByCertificateNumber)
+                        .filter(certificate -> certificate.getStudent().getId().equals(student.getId())))
+                .map(pdfRenderer::render)
                 .orElseThrow(() -> new ResourceNotFoundException("Certificate not found"));
     }
 }
