@@ -9,6 +9,8 @@ RUN mvn clean package -DskipTests -B
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+# Java needs these to shape Khmer text for certificates
+RUN apk add --no-cache fontconfig freetype ttf-dejavu
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 COPY --from=builder /app/target/*.jar app.jar
 RUN chown -R appuser:appgroup /app

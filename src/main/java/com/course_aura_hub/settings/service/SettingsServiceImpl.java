@@ -62,9 +62,25 @@ public class SettingsServiceImpl implements SettingsService {
     @Override
     @Transactional(readOnly = true)
     public boolean isNewEnrollmentAlertEnabled() {
+        return isAlertEnabled("newEnrollment");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isCourseCompletionAlertEnabled() {
+        return isAlertEnabled("courseCompletion");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isWeeklyReportEnabled() {
+        return isAlertEnabled("weeklyReport");
+    }
+
+    private boolean isAlertEnabled(String name) {
         PlatformSettings settings = platformSettingsRepository.findById(SETTINGS_ID)
                 .orElseGet(this::defaultSettings);
-        return Boolean.TRUE.equals(settings.getNotifications().get("newEnrollment"));
+        return Boolean.TRUE.equals(settings.getNotifications().get(name));
     }
 
     @Override
@@ -108,7 +124,6 @@ public class SettingsServiceImpl implements SettingsService {
         notifications.put("newEnrollment", true);
         notifications.put("courseCompletion", true);
         notifications.put("weeklyReport", false);
-        notifications.put("marketingEmails", false);
 
         return PlatformSettings.builder()
                 .id(SETTINGS_ID)
@@ -137,8 +152,7 @@ public class SettingsServiceImpl implements SettingsService {
         return new NotificationPreferences(
                 Boolean.TRUE.equals(safe.get("newEnrollment")),
                 Boolean.TRUE.equals(safe.get("courseCompletion")),
-                Boolean.TRUE.equals(safe.get("weeklyReport")),
-                Boolean.TRUE.equals(safe.get("marketingEmails"))
+                Boolean.TRUE.equals(safe.get("weeklyReport"))
         );
     }
 
@@ -147,7 +161,6 @@ public class SettingsServiceImpl implements SettingsService {
         notifications.put("newEnrollment", preferences.newEnrollmentEnabled());
         notifications.put("courseCompletion", preferences.courseCompletionEnabled());
         notifications.put("weeklyReport", preferences.weeklyReportEnabled());
-        notifications.put("marketingEmails", preferences.marketingEmailsEnabled());
         return notifications;
     }
 

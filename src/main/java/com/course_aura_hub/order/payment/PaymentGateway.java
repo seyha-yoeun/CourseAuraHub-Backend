@@ -2,6 +2,8 @@ package com.course_aura_hub.order.payment;
 
 import com.course_aura_hub.order.model.Order;
 
+import java.math.BigDecimal;
+
 /**
  * Port to a payment provider. Exactly one implementation is active, chosen by {@code app.payment.provider}.
  *
@@ -14,6 +16,11 @@ public interface PaymentGateway {
     String name();
 
     PaymentSession createPayment(Order order);
+
+    /**
+     * Opens one payment for a group of orders. The provider echoes {@code groupNumber} in its notifications.
+     */
+    PaymentSession createGroupPayment(String groupNumber, BigDecimal amount, String currency);
 
     /**
      * Authenticates and parses a webhook.

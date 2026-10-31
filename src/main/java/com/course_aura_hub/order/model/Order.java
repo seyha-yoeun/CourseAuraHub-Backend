@@ -53,6 +53,11 @@ public class Order {
     @JoinColumn(name = "coupon_id", updatable = false)
     private Coupon coupon;
 
+    // Set when this order shares one payment with others from the same cart
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id", updatable = false)
+    private OrderGroup group;
+
     @Column(name = "list_amount", nullable = false, updatable = false, precision = 10, scale = 2)
     private BigDecimal listAmount;
 

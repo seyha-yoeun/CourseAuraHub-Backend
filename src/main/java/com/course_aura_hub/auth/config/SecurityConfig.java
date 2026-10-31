@@ -112,7 +112,7 @@ public class SecurityConfig {
                         // Account administration
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // Client-safe platform branding
-                        .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").permitAll()
                         // Admin-only management resources
                         .requestMatchers(
                                 "/api/v1/students",

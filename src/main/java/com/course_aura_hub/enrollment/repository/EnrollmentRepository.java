@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +28,11 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, Integer>
     Optional<Enrollment> findByStudentIdAndCourseId(Integer studentId, Integer courseId);
 
     long countByCourseId(Integer courseId);
+
+    long countByEnrolledAtGreaterThanEqual(LocalDate since);
+
+    @Query("select coalesce(sum(e.amount), 0) from Enrollment e where e.enrolledAt >= :since")
+    BigDecimal sumAmountSince(@Param("since") LocalDate since);
 
     List<Enrollment> findByStudentId(Integer studentId);
 }
