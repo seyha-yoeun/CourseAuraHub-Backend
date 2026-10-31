@@ -48,6 +48,15 @@ public class CourseCertificate {
     @JoinColumn(name = "course_id", nullable = false, updatable = false)
     private Course course;
 
+    @Column(name = "learner_name", nullable = false, updatable = false, columnDefinition = "text")
+    private String learnerName;
+
+    @Column(name = "course_title", nullable = false, updatable = false, columnDefinition = "text")
+    private String courseTitle;
+
+    @Column(name = "instructor", nullable = false, updatable = false, columnDefinition = "text")
+    private String instructor;
+
     @Column(name = "issued_at", nullable = false, updatable = false)
     private Instant issuedAt;
 }
