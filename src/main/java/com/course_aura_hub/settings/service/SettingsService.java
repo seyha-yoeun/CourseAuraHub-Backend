@@ -12,5 +12,9 @@ public interface SettingsService {
 
     boolean isNewEnrollmentAlertEnabled();
 
+    boolean isCourseCompletionAlertEnabled();
+
+    boolean isWeeklyReportEnabled();
+
     PlatformSettingsResponse updateSettings(String email, SettingsUpdateRequest request);
 }

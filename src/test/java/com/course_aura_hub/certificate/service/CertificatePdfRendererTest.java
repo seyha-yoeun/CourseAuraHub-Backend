@@ -19,7 +19,7 @@ class CertificatePdfRendererTest {
     private static final String NUMBER = "CAH-7K2M-Q9X4-ZD3P-8HRT";
 
     private final CertificatePdfRenderer renderer =
-            new CertificatePdfRenderer(new CertificateProperties("https://example.com/certificates/"));
+            new CertificatePdfRenderer(new CertificateProperties("https://example.com/certificates/"), new CertificateTextOutliner());
 
     private CourseCertificate certificate(String learnerName, String courseTitle) {
         return CourseCertificate.builder()
@@ -64,8 +64,18 @@ class CertificatePdfRendererTest {
     }
 
     @Test
+    void render_drawsKhmerNamesAndWording() throws Exception {
+        CourseCertificate certificate = certificate("សុខ សុភា Sophea", "វគ្គសិក្សា Git");
+
+        assertThat(text(renderer.render(certificate))).contains(NUMBER);
+        try (PDDocument document = Loader.loadPDF(renderer.render(certificate, "km"))) {
+            assertThat(document.getNumberOfPages()).isEqualTo(1);
+        }
+    }
+
+    @Test
     void render_explainsWhenAScriptCannotBeDrawn() {
-        assertThatThrownBy(() -> renderer.render(certificate("សុខ សុភា", "Practical Kubernetes")))
+        assertThatThrownBy(() -> renderer.render(certificate("王小明", "Practical Kubernetes")))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Print");
     }

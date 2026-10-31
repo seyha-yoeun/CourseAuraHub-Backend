@@ -1,5 +1,8 @@
 package com.course_aura_hub.order.service;
 
+import com.course_aura_hub.cart.dto.CheckoutResponse;
+import com.course_aura_hub.cart.model.CartItem;
+import com.course_aura_hub.cart.repository.CartItemRepository;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.DuplicateResourceException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
@@ -19,10 +22,12 @@ import com.course_aura_hub.order.dto.AdminOrderPageResponse;
 import com.course_aura_hub.order.dto.AdminOrderResponse;
 import com.course_aura_hub.order.dto.OrderResponse;
 import com.course_aura_hub.order.model.Order;
+import com.course_aura_hub.order.model.OrderGroup;
 import com.course_aura_hub.order.model.OrderStatus;
 import com.course_aura_hub.order.payment.PaymentEvent;
 import com.course_aura_hub.order.payment.PaymentGateway;
 import com.course_aura_hub.order.payment.PaymentSession;
+import com.course_aura_hub.order.repository.OrderGroupRepository;
 import com.course_aura_hub.order.repository.OrderRepository;
 import com.course_aura_hub.student.model.Student;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
@@ -37,6 +42,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +54,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
+    private static final String GROUP_PREFIX = "GRP-";
     private static final int MAX_PAGE_SIZE = 100;
 
     private final OrderRepository orderRepository;
@@ -58,6 +65,8 @@ public class OrderServiceImpl implements OrderService {
     private final EnrollmentService enrollmentService;
     private final LearnerAccountService learnerAccountService;
     private final CouponService couponService;
+    private final OrderGroupRepository orderGroupRepository;
+    private final CartItemRepository cartItemRepository;
     private final NotificationService notificationService;
 
     @Override
@@ -92,7 +101,9 @@ public class OrderServiceImpl implements OrderService {
             boolean sameCoupon = Objects.equals(
                     order.getCoupon() == null ? null : order.getCoupon().getId(),
                     quote.coupon() == null ? null : quote.coupon().getId());
+            // A grouped order shares its payment with others, so it is never reused alone
             if (sameCoupon
+                    && order.getGroup() == null
                     && order.getAmount().compareTo(quote.finalAmount()) == 0
                     && order.getCurrency().equals(currency)) {
                 return order;
@@ -115,6 +126,128 @@ public class OrderServiceImpl implements OrderService {
                 .provider(provider)
                 .build();
         return orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public OrderGroup openGroup(String email, String couponCode, String currency, String provider) {
+        // Locking the learner serializes parallel checkouts, as in openOrder
+        Integer studentId = learnerAccountService.currentStudent(email).getId();
+        Student student = studentRepository.findByIdForUpdate(studentId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Student", studentId));
+
+        List<Course> courses = cartItemRepository.findByStudentIdOrderByAddedAtDescIdDesc(studentId).stream()
+                .map(CartItem::getCourse)
+                .filter(course -> course.getStatus() == CourseStatus.PUBLISHED)
+                .filter(course -> !studentCourseRepository.existsByStudentIdAndCourseId(studentId, course.getId()))
+                .toList();
+        if (courses.isEmpty()) {
+            throw new BusinessRuleException("Your cart is empty");
+        }
+
+        courses.forEach(course -> orderRepository
+                .findByStudentIdAndCourseIdAndStatus(studentId, course.getId(), OrderStatus.PENDING)
+                .ifPresent(this::cancelWithGroup));
+        orderRepository.flush();
+
+        Course couponCourse = StringUtils.hasText(couponCode) ? couponService.chooseCourse(couponCode, courses) : null;
+        OrderGroup group = orderGroupRepository.save(OrderGroup.builder()
+                .groupNumber(GROUP_PREFIX + OrderNumberGenerator.next())
+                .amount(BigDecimal.ZERO)
+                .currency(currency)
+                .build());
+
+        BigDecimal total = BigDecimal.ZERO;
+        for (Course course : courses) {
+            CouponQuote quote = course == couponCourse
+                    ? couponService.applyToOrder(couponCode, course, studentId, null)
+                    : CouponQuote.none(course);
+            total = total.add(quote.finalAmount());
+            orderRepository.save(Order.builder()
+                    .orderNumber(OrderNumberGenerator.next())
+                    .student(student)
+                    .course(course)
+                    .coupon(quote.coupon())
+                    .group(group)
+                    .listAmount(quote.listAmount())
+                    .discountAmount(quote.discountAmount())
+                    .amount(quote.finalAmount())
+                    .currency(currency)
+                    .status(OrderStatus.PENDING)
+                    .provider(provider)
+                    .build());
+        }
+        if (total.signum() > 0 && provider == null) {
+            throw new ServiceUnavailableException("Paid checkout is not available yet");
+        }
+        group.setAmount(total);
+        return group;
+    }
+
+    @Override
+    @Transactional
+    public CheckoutResponse completeFreeGroup(String groupNumber) {
+        OrderGroup group = findGroup(groupNumber);
+        if (group.getAmount().signum() != 0) {
+            throw new BusinessRuleException("This order requires payment");
+        }
+        List<Order> orders = orderRepository.findByGroupIdForUpdate(group.getId());
+        orders.stream().filter(order -> order.getStatus() == OrderStatus.PENDING).forEach(this::settle);
+        return toCheckoutResponse(group, orders);
+    }
+
+    @Override
+    @Transactional
+    public CheckoutResponse attachGroupSession(String groupNumber, PaymentSession session) {
+        OrderGroup group = findGroup(groupNumber);
+        List<Order> orders = orderRepository.findByGroupIdForUpdate(group.getId());
+        orders.forEach(order -> {
+            // A webhook may already have settled the group while the gateway call was in flight
+            order.setProviderReference(session.reference());
+            if (order.getStatus() == OrderStatus.PENDING) {
+                order.setCheckoutUrl(session.checkoutUrl());
+            }
+        });
+        return toCheckoutResponse(group, orders);
+    }
+
+    @Override
+    @Transactional
+    public void markGroupFailed(String groupNumber) {
+        orderRepository.findByGroupIdForUpdate(findGroup(groupNumber).getId()).stream()
+                .filter(order -> order.getStatus() == OrderStatus.PENDING)
+                .forEach(order -> {
+                    order.setStatus(OrderStatus.FAILED);
+                    order.setCheckoutUrl(null);
+                });
+    }
+
+    private OrderGroup findGroup(String groupNumber) {
+        return orderGroupRepository.findByGroupNumber(groupNumber)
+                .orElseThrow(() -> ResourceNotFoundException.of("Order group", groupNumber));
+    }
+
+    /** A payment covers its whole group, so no order in it can be cancelled alone. */
+    private void cancelWithGroup(Order order) {
+        List<Order> orders = order.getGroup() == null
+                ? List.of(order)
+                : orderRepository.findByGroupIdForUpdate(order.getGroup().getId());
+        orders.stream()
+                .filter(candidate -> candidate.getStatus() == OrderStatus.PENDING)
+                .forEach(candidate -> {
+                    candidate.setStatus(OrderStatus.CANCELLED);
+                    candidate.setCheckoutUrl(null);
+                });
+    }
+
+    private CheckoutResponse toCheckoutResponse(OrderGroup group, List<Order> orders) {
+        return new CheckoutResponse(
+                group.getGroupNumber(),
+                group.getAmount(),
+                group.getCurrency(),
+                orders.stream().map(Order::getCheckoutUrl).filter(Objects::nonNull).findFirst().orElse(null),
+                orders.stream().map(this::toResponse).toList()
+        );
     }
 
     @Override
@@ -177,14 +310,17 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new BusinessRuleException("Only a pending order can be cancelled");
         }
-        order.setStatus(OrderStatus.CANCELLED);
-        order.setCheckoutUrl(null);
+        cancelWithGroup(order);
         return toResponse(order);
     }
 
     @Override
     @Transactional
     public void applyPaymentEvent(PaymentEvent event) {
+        if (event.orderNumber().startsWith(GROUP_PREFIX)) {
+            applyGroupPaymentEvent(event);
+            return;
+        }
         Order order = lock(event.orderNumber());
 
         if (event.outcome() == PaymentEvent.Outcome.FAILED) {
@@ -211,6 +347,34 @@ public class OrderServiceImpl implements OrderService {
 
         // Money was taken, so a late payment on a cancelled or failed order still counts
         settle(order);
+    }
+
+    private void applyGroupPaymentEvent(PaymentEvent event) {
+        OrderGroup group = findGroup(event.orderNumber());
+        List<Order> orders = orderRepository.findByGroupIdForUpdate(group.getId());
+
+        if (event.outcome() == PaymentEvent.Outcome.FAILED) {
+            orders.stream().filter(order -> order.getStatus() == OrderStatus.PENDING).forEach(order -> {
+                order.setStatus(OrderStatus.FAILED);
+                order.setCheckoutUrl(null);
+                notifyLearner(order, NotificationType.PAYMENT_FAILED, "Payment failed",
+                        "Your payment for " + order.getCourse().getTitle() + " didn't go through. You haven't been enrolled.");
+            });
+            return;
+        }
+
+        if (group.getAmount().compareTo(event.amount()) != 0 || !group.getCurrency().equals(event.currency())) {
+            log.error(
+                    "Payment mismatch for group={}: expected {} {}, got {} {}",
+                    group.getGroupNumber(), group.getAmount(), group.getCurrency(), event.amount(), event.currency()
+            );
+            throw new BusinessRuleException("Payment does not match the order");
+        }
+
+        // Providers redeliver webhooks, and money taken still counts for a cancelled or failed order
+        orders.stream()
+                .filter(order -> order.getStatus() != OrderStatus.PAID && order.getStatus() != OrderStatus.REFUNDED)
+                .forEach(this::settle);
     }
 
     private void settle(Order order) {

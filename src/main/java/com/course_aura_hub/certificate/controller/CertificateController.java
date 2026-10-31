@@ -16,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -45,8 +46,12 @@ public class CertificateController {
             summary = "Download my certificate",
             description = "A4 landscape PDF with a QR code to the public verification page. Only for the learner who earned it."
     )
-    public ResponseEntity<byte[]> downloadPdf(@PathVariable String certificateNumber, Authentication authentication) {
-        byte[] pdf = certificateService.renderPdf(authentication.getName(), certificateNumber);
+    public ResponseEntity<byte[]> downloadPdf(
+            @PathVariable String certificateNumber,
+            @RequestParam(defaultValue = "en") String lang,
+            Authentication authentication
+    ) {
+        byte[] pdf = certificateService.renderPdf(authentication.getName(), certificateNumber, lang);
         String filename = "certificate-" + certificateNumber.trim().toUpperCase(Locale.ROOT) + ".pdf";
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
