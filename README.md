@@ -51,7 +51,7 @@ This repository is the **REST API** behind the platform. The web app lives in th
 cp .env.example .env
 #    then set JWT_SECRET, plus OAuth client IDs if you want social login
 
-# 2. Start PostgreSQL (port 5432) and pgAdmin (port 5050)
+# 2. Start PostgreSQL (port 5432), pgAdmin (port 5050), Mailpit (port 8025) and MinIO (API 9000, console 9001)
 docker compose up -d
 
 # 3. Run the API on http://localhost:8080

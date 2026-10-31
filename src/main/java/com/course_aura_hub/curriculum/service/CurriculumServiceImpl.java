@@ -21,6 +21,7 @@ import com.course_aura_hub.curriculum.model.LessonType;
 import com.course_aura_hub.curriculum.repository.CourseSectionRepository;
 import com.course_aura_hub.curriculum.repository.LessonProgressRepository;
 import com.course_aura_hub.curriculum.repository.LessonRepository;
+import com.course_aura_hub.file.service.FileService;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.notification.model.NotificationType;
 import com.course_aura_hub.notification.service.NotificationService;
@@ -60,6 +61,7 @@ public class CurriculumServiceImpl implements CurriculumService {
     private final CurriculumAssembler curriculumAssembler;
     private final CertificateService certificateService;
     private final NotificationService notificationService;
+    private final FileService fileService;
 
     @Override
     @Transactional(readOnly = true)
@@ -176,7 +178,7 @@ public class CurriculumServiceImpl implements CurriculumService {
                 .title(request.title().trim())
                 .type(LessonType.fromValue(request.type()))
                 .durationMinutes(request.durationMinutes() == null ? 0 : request.durationMinutes())
-                .contentUrl(trimToNull(request.contentUrl()))
+                .contentUrl(fileService.toStoredUrl(trimToNull(request.contentUrl())))
                 .preview(Boolean.TRUE.equals(request.preview()))
                 .position(position)
                 .build();
@@ -210,7 +212,7 @@ public class CurriculumServiceImpl implements CurriculumService {
             lesson.setDurationMinutes(request.durationMinutes());
         }
         if (request.contentUrl() != null) {
-            lesson.setContentUrl(trimToNull(request.contentUrl()));
+            lesson.setContentUrl(fileService.toStoredUrl(trimToNull(request.contentUrl())));
         }
         if (request.preview() != null) {
             lesson.setPreview(request.preview());
