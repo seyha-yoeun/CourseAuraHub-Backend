@@ -4,6 +4,7 @@ import com.course_aura_hub.auth.model.User;
 import com.course_aura_hub.auth.repository.UserRepository;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
+import com.course_aura_hub.file.service.FileService;
 import com.course_aura_hub.learner.dto.LearnerProfileResponse;
 import com.course_aura_hub.learner.dto.LearnerProfileUpdateRequest;
 import com.course_aura_hub.student.repository.StudentRepository;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Locale;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -22,6 +24,7 @@ public class ProfileServiceImpl implements ProfileService {
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
+    private final FileService fileService;
 
     @Override
     @Transactional(readOnly = true)
@@ -41,7 +44,11 @@ public class ProfileServiceImpl implements ProfileService {
             user.setLastName(requireText(request.lastName(), "Last name"));
         }
         if (request.imageUrl() != null) {
+            String previousImage = user.getImageUrl();
             user.setImageUrl(trimToNull(request.imageUrl()));
+            if (!Objects.equals(previousImage, user.getImageUrl())) {
+                fileService.release(previousImage, user.getId());
+            }
         }
         if (request.bio() != null) {
             user.setBio(trimToNull(request.bio()));

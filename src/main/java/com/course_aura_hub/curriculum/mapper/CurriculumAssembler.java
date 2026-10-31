@@ -4,6 +4,8 @@ import com.course_aura_hub.curriculum.dto.LessonResponse;
 import com.course_aura_hub.curriculum.dto.SectionResponse;
 import com.course_aura_hub.curriculum.model.CourseSection;
 import com.course_aura_hub.curriculum.model.Lesson;
+import com.course_aura_hub.file.service.FileService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -11,7 +13,10 @@ import java.util.Map;
 import java.util.Set;
 
 @Component
+@RequiredArgsConstructor
 public class CurriculumAssembler {
+
+    private final FileService fileService;
 
     /**
      * @param fullAccess     whether the viewer may see content URLs of non-preview lessons
@@ -48,7 +53,7 @@ public class CurriculumAssembler {
                 lesson.isPreview(),
                 lesson.getPosition(),
                 !unlocked,
-                unlocked ? lesson.getContentUrl() : null,
+                unlocked ? fileService.playableUrl(lesson.getContentUrl()) : null,
                 completed,
                 resumePosition
         );
