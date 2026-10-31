@@ -1,6 +1,7 @@
 package com.course_aura_hub.curriculum.service;
 
 import com.course_aura_hub.certificate.service.CertificateService;
+import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ForbiddenActionException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.course.model.Course;
@@ -14,6 +15,8 @@ import com.course_aura_hub.curriculum.repository.CourseProgressProjection;
 import com.course_aura_hub.curriculum.repository.LessonProgressRepository;
 import com.course_aura_hub.curriculum.repository.LessonRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
+import com.course_aura_hub.quiz.repository.QuizAttemptRepository;
+import com.course_aura_hub.quiz.repository.QuizQuestionRepository;
 import com.course_aura_hub.student.model.Student;
 import com.course_aura_hub.student.model.StudentCourse;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
@@ -46,6 +49,8 @@ public class LessonProgressServiceImpl implements LessonProgressService {
     private final StudentCourseRepository studentCourseRepository;
     private final LearnerAccountService learnerAccountService;
     private final CertificateService certificateService;
+    private final QuizQuestionRepository quizQuestionRepository;
+    private final QuizAttemptRepository quizAttemptRepository;
 
     @Override
     @Transactional
@@ -56,6 +61,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
         Student student = studentCourse.getStudent();
 
         if (lessonProgressRepository.findByStudentIdAndLessonId(student.getId(), lessonId).isEmpty()) {
+            requirePassedQuiz(lesson, student);
             lessonProgressRepository.save(LessonProgress.builder()
                     .student(student)
                     .lesson(lesson)
@@ -67,6 +73,15 @@ public class LessonProgressServiceImpl implements LessonProgressService {
         }
 
         return buildResponse(lessonId, true, course, studentCourse);
+    }
+
+    /** A quiz with questions is only completed by passing it. One without works like any other lesson. */
+    private void requirePassedQuiz(Lesson lesson, Student student) {
+        if (lesson.getType() == LessonType.QUIZ
+                && quizQuestionRepository.existsByLessonId(lesson.getId())
+                && !quizAttemptRepository.existsByStudentIdAndLessonIdAndPassedTrue(student.getId(), lesson.getId())) {
+            throw new BusinessRuleException("Pass the quiz to complete this lesson");
+        }
     }
 
     @Override

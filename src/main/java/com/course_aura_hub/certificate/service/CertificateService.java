@@ -38,6 +38,8 @@ public interface CertificateService {
 
     /**
      * The certificate as a printable PDF, for the learner who earned it. Anyone else's reads as missing.
+     *
+     * @param language {@code km} for Khmer wording, anything else for English
      */
-    byte[] renderPdf(String email, String certificateNumber);
+    byte[] renderPdf(String email, String certificateNumber, String language);
 }

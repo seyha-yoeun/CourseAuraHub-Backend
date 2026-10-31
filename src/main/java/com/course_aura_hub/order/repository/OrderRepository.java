@@ -24,6 +24,10 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     @Query("select o from Order o where o.orderNumber = :orderNumber")
     Optional<Order> findByOrderNumberForUpdate(@Param("orderNumber") String orderNumber);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from Order o where o.group.id = :groupId order by o.id")
+    List<Order> findByGroupIdForUpdate(@Param("groupId") Integer groupId);
+
     Optional<Order> findByStudentIdAndCourseIdAndStatus(Integer studentId, Integer courseId, OrderStatus status);
 
     @EntityGraph(attributePaths = "course")

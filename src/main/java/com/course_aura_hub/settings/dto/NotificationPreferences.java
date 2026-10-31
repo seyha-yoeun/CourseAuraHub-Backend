@@ -3,8 +3,7 @@ package com.course_aura_hub.settings.dto;
 public record NotificationPreferences(
         Boolean newEnrollment,
         Boolean courseCompletion,
-        Boolean weeklyReport,
-        Boolean marketingEmails
+        Boolean weeklyReport
 ) {
     public boolean newEnrollmentEnabled() {
         return Boolean.TRUE.equals(newEnrollment);
@@ -16,9 +15,5 @@ public record NotificationPreferences(
 
     public boolean weeklyReportEnabled() {
         return Boolean.TRUE.equals(weeklyReport);
-    }
-
-    public boolean marketingEmailsEnabled() {
-        return Boolean.TRUE.equals(marketingEmails);
     }
 }

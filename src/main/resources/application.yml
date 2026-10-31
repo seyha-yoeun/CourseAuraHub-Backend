@@ -102,6 +102,10 @@ app:
     # Frontend verification page. Printed on certificates, so it must be the public production URL.
     verify-url: ${CERTIFICATE_VERIFY_URL:http://localhost:3000/certificates}
 
+  reports:
+    # When the weekly report goes out, if it is switched on in Settings. Default: Mondays at 08:00, server time.
+    weekly-cron: ${WEEKLY_REPORT_CRON:0 0 8 * * MON}
+
   telegram:
     # Bot from @BotFather. A blank token turns Telegram off.
     bot-token: ${TELEGRAM_BOT_TOKEN:}

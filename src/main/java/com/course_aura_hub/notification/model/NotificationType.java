@@ -8,7 +8,9 @@ public enum NotificationType {
     ORDER_REFUNDED,
     CERTIFICATE_ISSUED,
     NEW_LESSON,
-    NEW_ENROLLMENT;
+    NEW_ENROLLMENT,
+    COURSE_COMPLETED,
+    WEEKLY_REPORT;
 
     public String apiValue() {
         return name().toLowerCase(Locale.ROOT);
