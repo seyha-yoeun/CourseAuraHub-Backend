@@ -256,7 +256,8 @@ class NotificationIntegrationTest extends LearnerIntegrationTestSupport {
     void studentWithoutAccount_canStillBeEnrolled() throws Exception {
         TestUser admin = registerAdmin();
         Integer courseId = courseRepository.findBySlug(createCourse(admin)).orElseThrow().getId();
-        Long before = jdbcTemplate.queryForObject("select count(*) from notifications", Long.class);
+        String learnerRows = "select count(*) from notifications where type <> 'NEW_ENROLLMENT'";
+        Long before = jdbcTemplate.queryForObject(learnerRows, Long.class);
 
         Map<String, Object> body = new HashMap<>();
         body.put("studentId", STUDENT_WITHOUT_ACCOUNT);
@@ -264,7 +265,28 @@ class NotificationIntegrationTest extends LearnerIntegrationTestSupport {
         mockMvc.perform(asJson(admin, post("/api/v1/enrollments"), body))
                 .andExpect(status().isCreated());
 
-        assertThat(jdbcTemplate.queryForObject("select count(*) from notifications", Long.class)).isEqualTo(before);
+        assertThat(jdbcTemplate.queryForObject(learnerRows, Long.class)).isEqualTo(before);
         Mockito.verify(streamRegistry, never()).send(any(UUID.class), any(), anyLong());
+    }
+
+    @Test
+    void newEnrollment_notifiesAdmins_unlessTheAlertIsOff() throws Exception {
+        TestUser admin = registerAdmin();
+        TestUser learner = registerUser();
+
+        enroll(learner, createCourse(admin));
+
+        assertThat(types(admin)).containsExactly("new_enrollment");
+        assertThat(types(learner)).doesNotContain("new_enrollment");
+
+        // Reading the settings creates their row
+        mockMvc.perform(as(admin, get("/api/v1/settings"))).andExpect(status().isOk());
+        jdbcTemplate.update("update platform_settings set notifications = notifications || '{\"newEnrollment\": false}'::jsonb");
+        try {
+            enroll(learner, createCourse(admin));
+            assertThat(types(admin)).containsExactly("new_enrollment");
+        } finally {
+            jdbcTemplate.update("update platform_settings set notifications = notifications || '{\"newEnrollment\": true}'::jsonb");
+        }
     }
 }

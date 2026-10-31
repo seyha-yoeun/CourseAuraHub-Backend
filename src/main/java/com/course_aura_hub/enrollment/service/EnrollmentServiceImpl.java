@@ -14,6 +14,7 @@ import com.course_aura_hub.notification.model.NotificationType;
 import com.course_aura_hub.notification.service.NotificationService;
 import com.course_aura_hub.enrollment.model.Enrollment;
 import com.course_aura_hub.enrollment.repository.EnrollmentRepository;
+import com.course_aura_hub.settings.service.SettingsService;
 import com.course_aura_hub.student.model.Student;
 import com.course_aura_hub.student.model.StudentCourse;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
@@ -42,6 +43,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final CourseMonthlyMetricRepository monthlyMetricRepository;
     private final EnrollmentAssembler enrollmentAssembler;
     private final NotificationService notificationService;
+    private final SettingsService settingsService;
 
     @Override
     @Transactional(readOnly = true)
@@ -106,6 +108,14 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 "You now have access to " + course.getTitle() + ".",
                 "/learn/" + course.getSlug()
         );
+        if (settingsService.isNewEnrollmentAlertEnabled()) {
+            notificationService.notifyAdmins(
+                    NotificationType.NEW_ENROLLMENT,
+                    "New enrollment",
+                    student.getName() + " enrolled in " + course.getTitle() + ".",
+                    "/courses/" + course.getSlug()
+            );
+        }
 
         log.info(
                 "Created enrollment id={} studentId={} courseId={} amount={}",
