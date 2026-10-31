@@ -13,6 +13,8 @@ import com.course_aura_hub.enrollment.dto.EnrollmentCreateRequest;
 import com.course_aura_hub.enrollment.repository.EnrollmentRepository;
 import com.course_aura_hub.enrollment.service.EnrollmentService;
 import com.course_aura_hub.learner.service.LearnerAccountService;
+import com.course_aura_hub.notification.model.NotificationType;
+import com.course_aura_hub.notification.service.NotificationService;
 import com.course_aura_hub.order.dto.AdminOrderPageResponse;
 import com.course_aura_hub.order.dto.AdminOrderResponse;
 import com.course_aura_hub.order.dto.OrderResponse;
@@ -56,6 +58,7 @@ public class OrderServiceImpl implements OrderService {
     private final EnrollmentService enrollmentService;
     private final LearnerAccountService learnerAccountService;
     private final CouponService couponService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -188,6 +191,8 @@ public class OrderServiceImpl implements OrderService {
             if (order.getStatus() == OrderStatus.PENDING) {
                 order.setStatus(OrderStatus.FAILED);
                 order.setCheckoutUrl(null);
+                notifyLearner(order, NotificationType.PAYMENT_FAILED, "Payment failed",
+                        "Your payment for " + order.getCourse().getTitle() + " didn't go through. You haven't been enrolled.");
             }
             return;
         }
@@ -259,12 +264,19 @@ public class OrderServiceImpl implements OrderService {
         order.setRefundedAt(Instant.now());
         enrollmentRepository.findByStudentIdAndCourseId(order.getStudent().getId(), order.getCourse().getId())
                 .ifPresent(enrollment -> enrollmentService.delete(enrollment.getId()));
+        notifyLearner(order, NotificationType.ORDER_REFUNDED, "Order refunded",
+                "Your order for " + order.getCourse().getTitle() + " was refunded.");
         orderRepository.flush();
 
         // Last on purpose: a failed refund rolls all of the above back
         gateway.refund(order);
         log.info("Refunded order={}", orderNumber);
         return toResponse(order);
+    }
+
+    private void notifyLearner(Order order, NotificationType type, String title, String message) {
+        notificationService.notifyStudent(
+                order.getStudent().getId(), type, title, message, "/courses/" + order.getCourse().getSlug());
     }
 
     private Order lock(String orderNumber) {

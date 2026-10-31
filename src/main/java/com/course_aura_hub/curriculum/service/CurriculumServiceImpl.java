@@ -22,6 +22,8 @@ import com.course_aura_hub.curriculum.repository.CourseSectionRepository;
 import com.course_aura_hub.curriculum.repository.LessonProgressRepository;
 import com.course_aura_hub.curriculum.repository.LessonRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
+import com.course_aura_hub.notification.model.NotificationType;
+import com.course_aura_hub.notification.service.NotificationService;
 import com.course_aura_hub.student.model.StudentCourse;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
 import com.course_aura_hub.curriculum.model.LessonWatchPosition;
@@ -57,6 +59,7 @@ public class CurriculumServiceImpl implements CurriculumService {
     private final LearnerAccountService learnerAccountService;
     private final CurriculumAssembler curriculumAssembler;
     private final CertificateService certificateService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -182,6 +185,7 @@ public class CurriculumServiceImpl implements CurriculumService {
 
         LessonResponse response = curriculumAssembler.toResponse(saved);
         refreshCourseTotals(course);
+        notifyNewLesson(course, saved);
         log.info("Created lesson id={} sectionId={} courseId={}", saved.getId(), section.getId(), course.getId());
         return response;
     }
@@ -253,6 +257,19 @@ public class CurriculumServiceImpl implements CurriculumService {
         int certified = certificateService.issueForCompletedLearners(course.getId());
         log.debug("Refreshed course totals courseId={} lessons={} minutes={} learnersRecalculated={} certified={}",
                 course.getId(), lessonCount, minutes, updated, certified);
+    }
+
+    private void notifyNewLesson(Course course, Lesson lesson) {
+        if (course.getStatus() != CourseStatus.PUBLISHED) {
+            return;
+        }
+        notificationService.notifyStudentsOnce(
+                studentCourseRepository.findStudentIdsByCourseId(course.getId()),
+                NotificationType.NEW_LESSON,
+                "New lesson",
+                lesson.getTitle() + " was added to " + course.getTitle() + ".",
+                "/learn/" + course.getSlug()
+        );
     }
 
     private Course findCourse(String slug) {
