@@ -16,6 +16,9 @@ public interface NotificationService {
     /** Like {@link #notifyStudent}, skipping anyone who still has an unread notification of this type and link. */
     void notifyStudentsOnce(Collection<Integer> studentIds, NotificationType type, String title, String message, String link);
 
+    /** Saves a notification for every enabled admin in the caller's transaction. */
+    void notifyAdmins(NotificationType type, String title, String message, String link);
+
     NotificationPageResponse findMine(UUID userId, boolean unreadOnly, int page, int size);
 
     long countUnread(UUID userId);

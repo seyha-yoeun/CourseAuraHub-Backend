@@ -1,5 +1,7 @@
 package com.course_aura_hub.notification.service;
 
+import com.course_aura_hub.auth.model.Role;
+import com.course_aura_hub.auth.repository.UserRepository;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.notification.dto.NotificationPageResponse;
 import com.course_aura_hub.notification.dto.NotificationResponse;
@@ -37,6 +39,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final StudentRepository studentRepository;
+    private final UserRepository userRepository;
     private final NotificationStreamRegistry streamRegistry;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -44,6 +47,12 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void notifyStudent(Integer studentId, NotificationType type, String title, String message, String link) {
         save(studentRepository.findUserIdsByIdIn(List.of(studentId)), type, title, message, link);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void notifyAdmins(NotificationType type, String title, String message, String link) {
+        save(userRepository.findEnabledIdsByRole(Role.ROLE_ADMIN), type, title, message, link);
     }
 
     @Override
