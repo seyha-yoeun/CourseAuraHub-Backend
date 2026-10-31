@@ -102,6 +102,17 @@ app:
     # Frontend verification page. Printed on certificates, so it must be the public production URL.
     verify-url: ${CERTIFICATE_VERIFY_URL:http://localhost:3000/certificates}
 
+  telegram:
+    # Bot from @BotFather. A blank token turns Telegram off.
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
+    bot-username: ${TELEGRAM_BOT_USERNAME:}
+    # Public webhook URL ending in /api/v1/telegram/webhook. Blank polls Telegram, for local development.
+    webhook-url: ${TELEGRAM_WEBHOOK_URL:}
+    webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+    poll-interval: ${TELEGRAM_POLL_INTERVAL:PT3S}
+    # Frontend origin that notification links open in
+    app-url: ${TELEGRAM_APP_URL:http://localhost:3000}
+
   demo-data:
     # Opt-in import of the bundled frontend mock dataset. Never overwrites existing rows.
     enabled: ${DEMO_DATA_ENABLED:false}

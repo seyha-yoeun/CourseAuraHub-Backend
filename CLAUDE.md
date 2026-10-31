@@ -35,6 +35,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `order` | Checkout, order history, refunds, `PaymentGateway` port | `/api/v1/me/orders`, `/api/v1/admin/orders`, `/api/v1/payments/webhooks/{provider}` |
 | `coupon` | Discount codes; redemptions are derived from orders | `/api/v1/me/coupons/preview`, `/api/v1/admin/coupons` |
 | `notification` | Saved notifications and the live SSE stream | `/api/v1/me/notifications`, `/api/v1/me/notifications/stream` |
+| `telegram` | Connects accounts to private chats, sends notifications there, bot commands | `/api/v1/me/telegram`, `/api/v1/telegram/webhook` |
 | `review` | Course reviews and ratings | `/api/v1/courses/{slug}/reviews`, `/api/v1/me/courses/{slug}/review` |
 | `common` | `ApiResponse`, shared exceptions + `DomainExceptionHandler`, `SecurityUtils` | — |
 | `config` | Demo data seeder, domain config properties | — |
@@ -55,6 +56,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Sale prices**: `courses.price` is always the regular price and a sale is never written to it. Use `Course.currentPrice()` for anything a learner sees or pays. Admin course responses keep the regular price, because the edit form saves it back. Catalog sorting by price uses the regular price.
 - **Coupons**: price orders only through `CouponService.applyToOrder`, which locks the coupon inside the order's transaction. `Order.amount` is what the learner pays, `listAmount` the price before discount. Orders that reach zero settle without a provider.
 - **Notifications**: call `NotificationService` inside the business transaction, so the row commits or rolls back with the change. Pushes happen after commit on the dispatcher's own threads. Open streams are held in memory per instance, so a push only reaches clients on the same server; the REST feed is always complete.
+- **Telegram**: `TelegramNotifier` listens to `NotificationsCreated`, so anything sent through `NotificationService` reaches connected chats without extra code. Bot replies must only use the account connected to the chat, and every dynamic value must go through `TelegramMessages.escape`. The bot token is part of Telegram URLs, so never log a Telegram client exception's cause.
 - **Never expose learner PII** (email, total spent) to non-admins. The `enrolledStudentList` field on course detail is admin-only.
 - **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013` is a large mock-data seed.
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
