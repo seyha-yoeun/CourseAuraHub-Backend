@@ -43,20 +43,20 @@ services:
     networks:
       - aura-network
 
-  # S3-compatible file storage (console: http://localhost:9001)
-  # MinIO stopped publishing official images and archived its repository, so this is Bitnami's frozen build.
   minio:
-    image: bitnamilegacy/minio:2025.7.23
-    container_name: course-aura-minio
+    image: quay.io/minio/aistor/minio:latest
+    container_name: minio
+    restart: always
     environment:
-      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
-      MINIO_SKIP_CLIENT: "yes"
-    ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      MINIO_ROOT_USER: root
+      MINIO_ROOT_PASSWORD: root@123
     volumes:
-      - minio_data:/bitnami/minio/data
+      - ./minio/data:/data
+      - ./minio/minio.license:/minio.license:ro
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001" --license /minio.license
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
@@ -73,8 +73,8 @@ services:
       minio:
         condition: service_healthy
     environment:
-      MINIO_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
-      MINIO_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
+      MINIO_USER: root
+      MINIO_PASSWORD: root@123
       BUCKET: ${STORAGE_BUCKET:-course-aura}
     entrypoint: >
       /bin/sh -c "
