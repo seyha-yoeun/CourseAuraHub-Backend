@@ -62,7 +62,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Notifications**: call `NotificationService` inside the business transaction, so the row commits or rolls back with the change. Pushes happen after commit on the dispatcher's own threads. Open streams are held in memory per instance, so a push only reaches clients on the same server; the REST feed is always complete.
 - **Telegram**: `TelegramNotifier` listens to `NotificationsCreated`, so anything sent through `NotificationService` reaches connected chats without extra code. Bot replies must only use the account connected to the chat, and every dynamic value must go through `TelegramMessages.escape`. The bot token is part of Telegram URLs, so never log a Telegram client exception's cause.
 - **Never expose learner PII** (email, total spent) to non-admins. The `enrolledStudentList` field on course detail is admin-only.
-- **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013` is a large mock-data seed.
+- **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013`, `V0017` and `V0036` seed sample data. Flyway runs each once, so add new seed data in a new migration and never edit an applied one.
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
 
 ## Roadmap (not yet built)

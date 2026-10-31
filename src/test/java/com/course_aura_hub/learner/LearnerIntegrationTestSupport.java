@@ -4,6 +4,7 @@ import com.course_aura_hub.auth.AuthIntegrationTestSupport;
 import com.course_aura_hub.auth.dto.RegisterRequest;
 import com.course_aura_hub.auth.model.Role;
 import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -20,6 +21,21 @@ public abstract class LearnerIntegrationTestSupport extends AuthIntegrationTestS
     protected static final String FREE_COURSE = "git-github-fundamentals";
     /** Paid, published course seeded by V0013. */
     protected static final String PAID_COURSE = "nuxt-3-mastery";
+
+    /**
+     * The seeded courses end in a quiz, which would block tests that simply complete every lesson.
+     * Quizzes have their own tests on courses those tests create.
+     */
+    @BeforeEach
+    void removeSeededQuizzes() {
+        jdbcTemplate.update("""
+                delete from quiz_questions where lesson_id in (
+                    select l.id from lessons l
+                    join course_sections s on s.id = l.section_id
+                    join courses c on c.id = s.course_id
+                    where c.slug in ('git-github-fundamentals', 'nuxt-3-mastery'))
+                """);
+    }
 
     protected record TestUser(String email, String accessToken) {
     }
