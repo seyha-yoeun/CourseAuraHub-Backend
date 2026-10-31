@@ -35,3 +35,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### MinIO: uploaded files and license ###
+/minio/
