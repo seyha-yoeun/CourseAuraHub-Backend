@@ -73,8 +73,9 @@ public class CartController {
             Authentication authentication
     ) {
         String couponCode = request == null ? null : request.couponCode();
+        String paymentMethod = request == null ? null : request.paymentMethod();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
-                checkoutFacade.checkoutCart(authentication.getName(), couponCode)
+                checkoutFacade.checkoutCart(authentication.getName(), couponCode, paymentMethod)
         ));
     }
 }

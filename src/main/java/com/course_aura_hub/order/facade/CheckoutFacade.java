@@ -5,9 +5,9 @@ import com.course_aura_hub.order.dto.OrderResponse;
 
 public interface CheckoutFacade {
 
-    OrderResponse checkout(String email, String courseSlug, String couponCode);
+    OrderResponse checkout(String email, String courseSlug, String couponCode, String paymentMethod);
 
-    CheckoutResponse checkoutCart(String email, String couponCode);
+    CheckoutResponse checkoutCart(String email, String couponCode, String paymentMethod);
 
     void handleWebhook(String provider, String signature, String payload);
 

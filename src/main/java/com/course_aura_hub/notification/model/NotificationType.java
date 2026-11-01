@@ -10,6 +10,7 @@ public enum NotificationType {
     NEW_LESSON,
     NEW_ENROLLMENT,
     COURSE_COMPLETED,
+    MEMBER_CARD,
     WEEKLY_REPORT;
 
     public String apiValue() {
