@@ -19,6 +19,13 @@ public interface MemberCardApplicationRepository extends JpaRepository<MemberCar
     @Query("select a from MemberCardApplication a where a.id = :id")
     Optional<MemberCardApplication> findByIdForUpdate(@Param("id") Integer id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from MemberCardApplication a where a.student.id = :studentId and a.status = :status")
+    Optional<MemberCardApplication> findByStudentIdAndStatusForUpdate(
+            @Param("studentId") Integer studentId,
+            @Param("status") MemberCardApplicationStatus status
+    );
+
     Optional<MemberCardApplication> findFirstByStudentIdOrderByCreatedAtDescIdDesc(Integer studentId);
 
     boolean existsByStudentIdAndStatus(Integer studentId, MemberCardApplicationStatus status);

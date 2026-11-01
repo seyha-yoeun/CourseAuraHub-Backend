@@ -15,6 +15,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -370,5 +371,97 @@ class MemberCardIntegrationTest extends LearnerIntegrationTestSupport {
                 .andExpect(jsonPath("$.data.items").isEmpty());
         mockMvc.perform(as(registerUser(), get(ADMIN + "/" + cardId + "/transactions")))
                 .andExpect(status().isForbidden());
+    }
+
+    private int studentId(TestUser learner) throws Exception {
+        String body = apply(learner).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        return JsonPath.read(body, "$.data.studentId");
+    }
+
+    private ResultActions createCard(TestUser admin, int studentId, BigDecimal openingBalance) throws Exception {
+        return mockMvc.perform(asJson(admin, post(ADMIN), Map.of(
+                "studentId", studentId, "holderName", "Jane Card", "openingBalance", openingBalance)));
+    }
+
+    @Test
+    void creating_issuesACardWithItsOpeningBalanceInTheLedger() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        int studentId = studentId(learner);
+
+        String body = createCard(admin, studentId, BigDecimal.TEN)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.holderName").value("Jane Card"))
+                .andReturn().getResponse().getContentAsString();
+        int cardId = JsonPath.read(body, "$.data.id");
+
+        expectSameAmount(balance(learner), BigDecimal.TEN);
+        assertThat(ledgerRows(cardId)).isEqualTo(1);
+        // The application it replaced is closed, not left waiting for a review that can't succeed
+        mockMvc.perform(as(learner, get(MINE)))
+                .andExpect(jsonPath("$.data.application.status").value("APPROVED"));
+        createCard(admin, studentId, BigDecimal.ZERO).andExpect(status().isConflict());
+    }
+
+    @Test
+    void creating_isForAdminsOnly() throws Exception {
+        TestUser learner = registerUser();
+
+        createCard(learner, studentId(learner), BigDecimal.TEN).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void readingAndRenaming_changeNoMoney() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        int cardId = issueCard(learner, admin);
+        topUp(admin, cardId, BigDecimal.TEN);
+
+        mockMvc.perform(asJson(admin, put(ADMIN + "/" + cardId), Map.of("holderName", "  Jane Renamed  ")))
+                .andExpect(status().isOk());
+        mockMvc.perform(as(admin, get(ADMIN + "/" + cardId)))
+                .andExpect(jsonPath("$.data.holderName").value("Jane Renamed"));
+        mockMvc.perform(asJson(admin, put(ADMIN + "/" + cardId), Map.of("holderName", "")))
+                .andExpect(status().isBadRequest());
+
+        expectSameAmount(balance(learner), BigDecimal.TEN);
+    }
+
+    @Test
+    void search_findsCardsByHolderNumberOrEmail() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        int cardId = issueCard(learner, admin);
+
+        mockMvc.perform(as(admin, get(ADMIN).param("search", learner.email().toUpperCase())))
+                .andExpect(jsonPath("$.data.items[0].id").value(cardId));
+        mockMvc.perform(as(admin, get(ADMIN).param("search", "no-such-card")))
+                .andExpect(jsonPath("$.data.items").isEmpty());
+    }
+
+    @Test
+    void deleting_removesAnUnusedCardAndAllowsANewApplication() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        int cardId = issueCard(learner, admin);
+
+        mockMvc.perform(as(admin, delete(ADMIN + "/" + cardId))).andExpect(status().isOk());
+
+        mockMvc.perform(as(admin, get(ADMIN + "/" + cardId))).andExpect(status().isNotFound());
+        mockMvc.perform(as(learner, get(MINE))).andExpect(jsonPath("$.data.card").doesNotExist());
+        apply(learner).andExpect(status().isCreated());
+    }
+
+    @Test
+    void deleting_isRefusedOnceTheCardHasHistory() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        int cardId = issueCard(learner, admin);
+        topUp(admin, cardId, BigDecimal.TEN);
+
+        mockMvc.perform(as(admin, delete(ADMIN + "/" + cardId))).andExpect(status().isBadRequest());
+
+        expectSameAmount(balance(learner), BigDecimal.TEN);
+        assertThat(ledgerRows(cardId)).isEqualTo(1);
     }
 }
