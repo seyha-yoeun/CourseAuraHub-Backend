@@ -6,6 +6,8 @@ public record OrderCreateRequest(
         @NotBlank(message = "Course slug is required")
         String courseSlug,
         // Optional discount code
-        String couponCode
+        String couponCode,
+        // ONLINE by default, or MEMBER_CARD
+        String paymentMethod
 ) {
 }
