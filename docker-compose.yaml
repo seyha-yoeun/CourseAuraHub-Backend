@@ -85,6 +85,91 @@ services:
     networks:
       - aura-network
 
+  # Centralized logs. Opt-in: docker compose --profile logging up -d (see docs/logging.md)
+  loki:
+    image: grafana/loki:3.7.5
+    container_name: course-aura-loki
+    profiles: [logging]
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yaml
+    mem_limit: 512m
+    volumes:
+      - ./observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - logging-network
+
+  alloy:
+    image: grafana/alloy:v1.21.3
+    container_name: course-aura-alloy
+    profiles: [logging]
+    restart: unless-stopped
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --disable-reporting
+    mem_limit: 256m
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ./logs:/var/log/course-aura-hub:ro
+      - alloy_data:/var/lib/alloy/data
+    depends_on:
+      - loki
+    # The Loki image has no shell or HTTP client, so Loki's readiness is checked from here too
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - |
+          for target in 127.0.0.1/12345/-/ready loki/3100/ready; do
+            IFS=/ read -r host port path <<< "$$target"
+            exec 3<>"/dev/tcp/$$host/$$port" || exit 1
+            printf 'GET /%s HTTP/1.0\r\nHost: %s\r\n\r\n' "$$path" "$$host" >&3
+            head -n 1 <&3 | grep -q ' 200 ' || exit 1
+            exec 3>&-
+          done
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - logging-network
+
+  grafana:
+    image: grafana/grafana:13.2.5
+    container_name: course-aura-grafana
+    profiles: [logging]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    # Host port 3000 belongs to the Nuxt frontend
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    mem_limit: 512m
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      alloy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - logging-network
+
 volumes:
   minio_data:
     driver: local
@@ -92,7 +177,16 @@ volumes:
     driver: local
   pgadmin_data:
     driver: local
+  loki_data:
+    driver: local
+  alloy_data:
+    driver: local
+  grafana_data:
+    driver: local
 
 networks:
   aura-network:
+    driver: bridge
+  # Only Grafana publishes a port; the app itself doesn't need to reach this network
+  logging-network:
     driver: bridge

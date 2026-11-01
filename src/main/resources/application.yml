@@ -236,3 +236,18 @@ logging:
     com.course_aura_hub: ${LOG_LEVEL_APP:INFO}
     org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
     org.hibernate.SQL: ${LOG_LEVEL_SQL:INFO}
+  # The console stays human-readable; this JSON file is what Alloy ships to Loki (docs/logging.md).
+  # Set LOG_FILE_PATH to an empty value to turn the file off.
+  file:
+    name: ${LOG_FILE_PATH:logs/course-aura-hub.log}
+  structured:
+    format:
+      file: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
+      total-size-cap: 200MB
