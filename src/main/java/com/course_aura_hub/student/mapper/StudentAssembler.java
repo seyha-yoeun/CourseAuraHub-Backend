@@ -31,7 +31,8 @@ public class StudentAssembler {
                 student.getLastActive(),
                 student.getStatus().apiValue(),
                 completedCourses,
-                student.getCountry()
+                student.getCountry(),
+                student.getUser() == null ? null : student.getUser().getId()
         );
     }
 }
