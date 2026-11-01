@@ -6,6 +6,7 @@ import com.course_aura_hub.membercard.dto.MemberCardAdjustmentRequest;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationRequest;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationResponse;
+import com.course_aura_hub.membercard.dto.MemberCardCreateRequest;
 import com.course_aura_hub.membercard.dto.MemberCardOverviewResponse;
 import com.course_aura_hub.membercard.dto.MemberCardPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardResponse;
@@ -13,6 +14,7 @@ import com.course_aura_hub.membercard.dto.MemberCardReviewRequest;
 import com.course_aura_hub.membercard.dto.MemberCardStatusRequest;
 import com.course_aura_hub.membercard.dto.MemberCardTransactionPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardTransactionResponse;
+import com.course_aura_hub.membercard.dto.MemberCardUpdateRequest;
 import com.course_aura_hub.membercard.service.MemberCardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,10 +25,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -102,12 +106,53 @@ public class MemberCardController {
 
     @GetMapping("/api/v1/admin/member-cards")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "List cards", description = "Admin-only. Newest first.")
+    @Operation(summary = "List cards", description = "Admin-only. Newest first, optionally by name, number or email.")
     public ResponseEntity<ApiResponse<MemberCardPageResponse>> cards(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(ApiResponse.success(memberCardService.findCards(page, size)));
+        return ResponseEntity.ok(ApiResponse.success(memberCardService.findCards(search, page, size)));
+    }
+
+    @PostMapping("/api/v1/admin/member-cards")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Create a card", description = "Admin-only. Issues a card without an application.")
+    public ResponseEntity<ApiResponse<MemberCardResponse>> create(
+            @Valid @RequestBody MemberCardCreateRequest request,
+            @AuthenticationPrincipal AuthUserPrincipal admin
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(memberCardService.create(admin.getUserId(), request)));
+    }
+
+    @GetMapping("/api/v1/admin/member-cards/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get a card", description = "Admin-only.")
+    public ResponseEntity<ApiResponse<MemberCardResponse>> card(@PathVariable Integer id) {
+        return ResponseEntity.ok(ApiResponse.success(memberCardService.findCard(id)));
+    }
+
+    @PutMapping("/api/v1/admin/member-cards/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update a card", description = "Admin-only. Balances change through adjustments.")
+    public ResponseEntity<ApiResponse<MemberCardResponse>> update(
+            @PathVariable Integer id,
+            @Valid @RequestBody MemberCardUpdateRequest request,
+            @AuthenticationPrincipal AuthUserPrincipal admin
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(memberCardService.update(id, admin.getUserId(), request)));
+    }
+
+    @DeleteMapping("/api/v1/admin/member-cards/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete a card", description = "Admin-only. Refused once the card has any transactions.")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal AuthUserPrincipal admin
+    ) {
+        memberCardService.delete(id, admin.getUserId());
+        return ResponseEntity.ok(ApiResponse.success("Member card deleted successfully", null));
     }
 
     @GetMapping("/api/v1/admin/member-cards/{id}/transactions")
