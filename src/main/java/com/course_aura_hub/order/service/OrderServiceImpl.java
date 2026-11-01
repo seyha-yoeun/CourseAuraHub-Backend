@@ -16,6 +16,7 @@ import com.course_aura_hub.enrollment.dto.EnrollmentCreateRequest;
 import com.course_aura_hub.enrollment.repository.EnrollmentRepository;
 import com.course_aura_hub.enrollment.service.EnrollmentService;
 import com.course_aura_hub.learner.service.LearnerAccountService;
+import com.course_aura_hub.membercard.service.MemberCardService;
 import com.course_aura_hub.notification.model.NotificationType;
 import com.course_aura_hub.notification.service.NotificationService;
 import com.course_aura_hub.order.dto.AdminOrderPageResponse;
@@ -26,6 +27,7 @@ import com.course_aura_hub.order.model.OrderGroup;
 import com.course_aura_hub.order.model.OrderStatus;
 import com.course_aura_hub.order.payment.PaymentEvent;
 import com.course_aura_hub.order.payment.PaymentGateway;
+import com.course_aura_hub.order.payment.PaymentMethod;
 import com.course_aura_hub.order.payment.PaymentSession;
 import com.course_aura_hub.order.repository.OrderGroupRepository;
 import com.course_aura_hub.order.repository.OrderRepository;
@@ -68,6 +70,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderGroupRepository orderGroupRepository;
     private final CartItemRepository cartItemRepository;
     private final NotificationService notificationService;
+    private final MemberCardService memberCardService;
 
     @Override
     @Transactional
@@ -104,6 +107,7 @@ public class OrderServiceImpl implements OrderService {
             // A grouped order shares its payment with others, so it is never reused alone
             if (sameCoupon
                     && order.getGroup() == null
+                    && Objects.equals(order.getProvider(), provider)
                     && order.getAmount().compareTo(quote.finalAmount()) == 0
                     && order.getCurrency().equals(currency)) {
                 return order;
@@ -248,6 +252,63 @@ public class OrderServiceImpl implements OrderService {
                 orders.stream().map(Order::getCheckoutUrl).filter(Objects::nonNull).findFirst().orElse(null),
                 orders.stream().map(this::toResponse).toList()
         );
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse payWithMemberCard(String email, String orderNumber) {
+        Integer studentId = lockLearner(email);
+        Order order = lock(orderNumber);
+        requireOwnedCardOrder(order, studentId);
+        if (order.getStatus() == OrderStatus.PAID) {
+            return toResponse(order);
+        }
+        requirePayable(order);
+
+        memberCardService.charge(studentId, order.getAmount(), order.getOrderNumber(), order.getCourse().getTitle());
+        settle(order);
+        return toResponse(order);
+    }
+
+    @Override
+    @Transactional
+    public CheckoutResponse payGroupWithMemberCard(String email, String groupNumber) {
+        Integer studentId = lockLearner(email);
+        OrderGroup group = findGroup(groupNumber);
+        List<Order> orders = orderRepository.findByGroupIdForUpdate(group.getId());
+        orders.forEach(order -> requireOwnedCardOrder(order, studentId));
+        if (orders.stream().allMatch(order -> order.getStatus() == OrderStatus.PAID)) {
+            return toCheckoutResponse(group, orders);
+        }
+        orders.forEach(this::requirePayable);
+
+        memberCardService.charge(studentId, group.getAmount(), group.getGroupNumber(), orders.size() + " courses");
+        orders.forEach(this::settle);
+        return toCheckoutResponse(group, orders);
+    }
+
+    /** Holding this until commit makes a parallel checkout see the enrollment, so it can't charge twice. */
+    private Integer lockLearner(String email) {
+        Integer studentId = learnerAccountService.currentStudent(email).getId();
+        return studentRepository.findByIdForUpdate(studentId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Student", studentId))
+                .getId();
+    }
+
+    private void requireOwnedCardOrder(Order order, Integer studentId) {
+        if (!order.getStudent().getId().equals(studentId)
+                || !PaymentMethod.MEMBER_CARD_PROVIDER.equals(order.getProvider())) {
+            throw ResourceNotFoundException.of("Order", order.getOrderNumber());
+        }
+    }
+
+    private void requirePayable(Order order) {
+        if (order.getStatus() != OrderStatus.PENDING) {
+            throw new BusinessRuleException("This order can no longer be paid");
+        }
+        if (studentCourseRepository.existsByStudentIdAndCourseId(order.getStudent().getId(), order.getCourse().getId())) {
+            throw new DuplicateResourceException("You are already enrolled in this course");
+        }
     }
 
     @Override
@@ -423,6 +484,10 @@ public class OrderServiceImpl implements OrderService {
         if (order.getAmount().signum() == 0) {
             throw new BusinessRuleException("This order was free, so there is nothing to refund");
         }
+        boolean byCard = PaymentMethod.MEMBER_CARD_PROVIDER.equals(order.getProvider());
+        if (!byCard && gateway == null) {
+            throw new ServiceUnavailableException("Paid checkout is not available yet");
+        }
 
         order.setStatus(OrderStatus.REFUNDED);
         order.setRefundedAt(Instant.now());
@@ -433,7 +498,12 @@ public class OrderServiceImpl implements OrderService {
         orderRepository.flush();
 
         // Last on purpose: a failed refund rolls all of the above back
-        gateway.refund(order);
+        if (byCard) {
+            memberCardService.refund(
+                    order.getStudent().getId(), order.getAmount(), order.getOrderNumber(), order.getCourse().getTitle());
+        } else {
+            gateway.refund(order);
+        }
         log.info("Refunded order={}", orderNumber);
         return toResponse(order);
     }

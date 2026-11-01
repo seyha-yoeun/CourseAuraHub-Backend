@@ -35,6 +35,12 @@ public interface OrderService {
 
     void markGroupFailed(String groupNumber);
 
+    /** Takes the order's price from the learner's card and enrolls them, both or neither. Safe to repeat. */
+    OrderResponse payWithMemberCard(String email, String orderNumber);
+
+    /** Takes the group's total from the learner's card and enrolls them in every course, all or nothing. */
+    CheckoutResponse payGroupWithMemberCard(String email, String groupNumber);
+
     /** Settles an order that a coupon reduced to zero, which no provider needs to see. */
     OrderResponse completeFreeOrder(String orderNumber);
 
@@ -53,5 +59,6 @@ public interface OrderService {
 
     AdminOrderPageResponse findAll(String status, int page, int size);
 
+    /** @param gateway active gateway, or null when none is configured; card orders don't need one */
     OrderResponse refund(String orderNumber, PaymentGateway gateway);
 }
