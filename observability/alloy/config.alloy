@@ -1,0 +1,64 @@
+// Tails the JSON log file Spring Boot writes and ships it to Loki.
+// The backend usually runs on the host, so Docker's own log stream can't see it; the file works
+// the same whether the app runs on the host or in a container. This is the only log source, which
+// is what keeps entries from being collected twice.
+
+logging {
+  level  = "warn"
+  format = "logfmt"
+}
+
+local.file_match "backend" {
+  // Only the live file: rotated logs end in .gz and were already shipped
+  path_targets = [{
+    __path__ = "/var/log/course-aura-hub/*.log",
+    job      = "course-aura-hub",
+  }]
+  sync_period = "5s"
+}
+
+loki.source.file "backend" {
+  targets    = local.file_match.backend.targets
+  forward_to = [loki.process.backend.receiver]
+}
+
+loki.process "backend" {
+  forward_to = [loki.write.local.receiver]
+
+  // A second line of defence: the app must not log these at all
+  stage.replace {
+    expression = "(?i)bearer\\s+([A-Za-z0-9._~+/=-]+)"
+    replace    = "[REDACTED]"
+  }
+  stage.replace {
+    expression = "(eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)"
+    replace    = "[REDACTED]"
+  }
+
+  stage.json {
+    expressions = {
+      timestamp = "\"@timestamp\"",
+      level     = "level",
+      service   = "service",
+    }
+  }
+
+  // Labels stay low-cardinality; everything else is searched with `| json`
+  stage.labels {
+    values = {
+      level   = "",
+      service = "",
+    }
+  }
+
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339Nano"
+  }
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

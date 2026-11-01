@@ -67,6 +67,16 @@ Flyway creates the schema and seeds sample data on first start: about a year of 
 - pgAdmin: http://localhost:5050
 - Postman collection: [`postman/`](postman/README.md)
 
+## Logs
+
+The backend writes JSON logs to `logs/course-aura-hub.log`. To search them in Grafana at http://localhost:3001:
+
+```bash
+docker compose --profile logging up -d
+```
+
+See [docs/logging.md](docs/logging.md) for ports, queries, retention and troubleshooting.
+
 ## Configuration
 
 All configuration lives in `src/main/resources/application.yml` and reads its values from environment variables. [`.env.example`](.env.example) lists every variable. The main groups are:
