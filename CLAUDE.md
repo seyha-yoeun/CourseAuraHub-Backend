@@ -67,6 +67,8 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013`, `V0017` and `V0036` seed sample data. Flyway runs each once, so add new seed data in a new migration and never edit an applied one.
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
 
+- **Logging**: the console stays human-readable; `logs/course-aura-hub.log` is Logstash JSON and Alloy ships it to Loki (`docs/logging.md`). `RequestLoggingFilter` logs method, path, status and duration and sets the `requestId` MDC value. Never add query strings, headers, cookies or bodies to it. `docker compose down -v` also deletes Postgres data.
+
 ## Roadmap (not yet built)
 
 1. A real payment provider behind `PaymentGateway`; only the dev-only `fake` gateway exists, so paid checkout is off by default.
