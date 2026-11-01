@@ -14,5 +14,7 @@ public interface MemberCardTransactionRepository extends JpaRepository<MemberCar
 
     Optional<MemberCardTransaction> findByCardIdAndIdempotencyKey(Integer cardId, String idempotencyKey);
 
+    boolean existsByCardId(Integer cardId);
+
     boolean existsByTypeAndReference(MemberCardTransactionType type, String reference);
 }

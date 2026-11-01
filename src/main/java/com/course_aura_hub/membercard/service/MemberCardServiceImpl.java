@@ -9,11 +9,13 @@ import com.course_aura_hub.membercard.dto.MemberCardAdjustmentRequest;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationRequest;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationResponse;
+import com.course_aura_hub.membercard.dto.MemberCardCreateRequest;
 import com.course_aura_hub.membercard.dto.MemberCardOverviewResponse;
 import com.course_aura_hub.membercard.dto.MemberCardPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardResponse;
 import com.course_aura_hub.membercard.dto.MemberCardTransactionPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardTransactionResponse;
+import com.course_aura_hub.membercard.dto.MemberCardUpdateRequest;
 import com.course_aura_hub.membercard.model.MemberCard;
 import com.course_aura_hub.membercard.model.MemberCardApplication;
 import com.course_aura_hub.membercard.model.MemberCardApplicationStatus;
@@ -144,20 +146,8 @@ public class MemberCardServiceImpl implements MemberCardService {
         }
 
         close(application, MemberCardApplicationStatus.APPROVED, adminId, null);
-        MemberCard card = cardRepository.save(MemberCard.builder()
-                .cardNumber(MemberCardNumberGenerator.next())
-                .student(student)
-                .holderName(application.getFullName())
-                .balance(BigDecimal.ZERO)
-                .status(MemberCardStatus.ACTIVE)
-                .build());
-        notificationService.notifyStudent(
-                student.getId(),
-                NotificationType.MEMBER_CARD,
-                "Member card approved",
-                "Your member card " + card.getCardNumber() + " is ready.",
-                LINK
-        );
+        MemberCard card = issue(student, application.getFullName());
+        notifyIssued(card);
         log.info("Approved member card application id={} card={}", applicationId, card.getId());
         return toResponse(application);
     }
@@ -180,8 +170,9 @@ public class MemberCardServiceImpl implements MemberCardService {
 
     @Override
     @Transactional(readOnly = true)
-    public MemberCardPageResponse findCards(int page, int size) {
-        Page<MemberCard> cards = cardRepository.findAll(pageRequest(page, size));
+    public MemberCardPageResponse findCards(String search, int page, int size) {
+        String pattern = StringUtils.hasText(search) ? "%" + search.trim().toLowerCase(Locale.ROOT) + "%" : "%";
+        Page<MemberCard> cards = cardRepository.search(pattern, pageRequest(page, size));
         return new MemberCardPageResponse(
                 cards.map(this::toResponse).getContent(),
                 cards.getNumber(),
@@ -189,6 +180,68 @@ public class MemberCardServiceImpl implements MemberCardService {
                 cards.getTotalElements(),
                 cards.getTotalPages()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public MemberCardResponse findCard(Integer cardId) {
+        return cardRepository.findById(cardId)
+                .map(this::toResponse)
+                .orElseThrow(() -> ResourceNotFoundException.of("Member card", cardId));
+    }
+
+    @Override
+    @Transactional
+    public MemberCardResponse create(UUID adminId, MemberCardCreateRequest request) {
+        Integer studentId = request.studentId();
+        // Application before learner, the order approve() takes them in, so the two can't deadlock
+        var pending = applicationRepository.findByStudentIdAndStatusForUpdate(
+                studentId, MemberCardApplicationStatus.PENDING);
+        Student student = studentRepository.findByIdForUpdate(studentId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Student", studentId));
+        requireNotOwnCard(student, adminId);
+        if (cardRepository.existsByStudentId(studentId)) {
+            throw new DuplicateResourceException("This learner already has a member card");
+        }
+
+        pending.ifPresent(application -> close(application, MemberCardApplicationStatus.APPROVED, adminId, null));
+        MemberCard card = issue(student, request.holderName().trim());
+        BigDecimal openingBalance = request.openingBalance();
+        if (openingBalance != null && openingBalance.signum() > 0) {
+            record(card, MemberCardTransactionType.TOP_UP, openingBalance, null, null, "Opening balance", adminId);
+        }
+        notifyIssued(card);
+        log.info("Issued member card id={} directly by admin={}", card.getId(), adminId);
+        return toResponse(card);
+    }
+
+    @Override
+    @Transactional
+    public MemberCardResponse update(Integer cardId, UUID adminId, MemberCardUpdateRequest request) {
+        MemberCard card = lockCard(cardId);
+        requireNotOwnCard(card.getStudent(), adminId);
+        card.setHolderName(request.holderName().trim());
+        log.info("Updated member card id={} by admin={}", cardId, adminId);
+        return toResponse(card);
+    }
+
+    @Override
+    @Transactional
+    public void delete(Integer cardId, UUID adminId) {
+        MemberCard card = lockCard(cardId);
+        requireNotOwnCard(card.getStudent(), adminId);
+        if (transactionRepository.existsByCardId(cardId)) {
+            throw new BusinessRuleException("This card has transactions, so it can't be deleted. Suspend it instead.");
+        }
+        cardRepository.delete(card);
+        notificationService.notifyStudent(
+                card.getStudent().getId(),
+                NotificationType.MEMBER_CARD,
+                "Member card removed",
+                "Your member card " + card.getCardNumber() + " was removed.",
+                LINK
+        );
+        log.info("Deleted member card id={} by admin={}", cardId, adminId);
     }
 
     @Override
@@ -282,6 +335,26 @@ public class MemberCardServiceImpl implements MemberCardService {
             return;
         }
         record(card, MemberCardTransactionType.REFUND, amount, reference, null, note, null);
+    }
+
+    private MemberCard issue(Student student, String holderName) {
+        return cardRepository.save(MemberCard.builder()
+                .cardNumber(MemberCardNumberGenerator.next())
+                .student(student)
+                .holderName(holderName)
+                .balance(BigDecimal.ZERO)
+                .status(MemberCardStatus.ACTIVE)
+                .build());
+    }
+
+    private void notifyIssued(MemberCard card) {
+        notificationService.notifyStudent(
+                card.getStudent().getId(),
+                NotificationType.MEMBER_CARD,
+                "Member card approved",
+                "Your member card " + card.getCardNumber() + " is ready.",
+                LINK
+        );
     }
 
     /** @param change positive adds to the balance, negative takes from it */

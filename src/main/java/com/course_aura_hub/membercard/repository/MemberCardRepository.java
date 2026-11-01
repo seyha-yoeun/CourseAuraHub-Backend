@@ -26,7 +26,13 @@ public interface MemberCardRepository extends JpaRepository<MemberCard, Integer>
     @Query("select c from MemberCard c where c.student.id = :studentId")
     Optional<MemberCard> findByStudentIdForUpdate(@Param("studentId") Integer studentId);
 
-    @Override
+    /** @param pattern a lowercase LIKE pattern; "%" matches every card */
     @EntityGraph(attributePaths = "student")
-    Page<MemberCard> findAll(Pageable pageable);
+    @Query("""
+            select c from MemberCard c
+            where lower(c.holderName) like :pattern
+               or lower(c.cardNumber) like :pattern
+               or lower(c.student.email) like :pattern
+            """)
+    Page<MemberCard> search(@Param("pattern") String pattern, Pageable pageable);
 }

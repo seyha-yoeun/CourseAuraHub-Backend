@@ -4,11 +4,13 @@ import com.course_aura_hub.membercard.dto.MemberCardAdjustmentRequest;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationRequest;
 import com.course_aura_hub.membercard.dto.MemberCardApplicationResponse;
+import com.course_aura_hub.membercard.dto.MemberCardCreateRequest;
 import com.course_aura_hub.membercard.dto.MemberCardOverviewResponse;
 import com.course_aura_hub.membercard.dto.MemberCardPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardResponse;
 import com.course_aura_hub.membercard.dto.MemberCardTransactionPageResponse;
 import com.course_aura_hub.membercard.dto.MemberCardTransactionResponse;
+import com.course_aura_hub.membercard.dto.MemberCardUpdateRequest;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -27,7 +29,17 @@ public interface MemberCardService {
 
     MemberCardApplicationResponse reject(Integer applicationId, UUID adminId, String note);
 
-    MemberCardPageResponse findCards(int page, int size);
+    MemberCardPageResponse findCards(String search, int page, int size);
+
+    MemberCardResponse findCard(Integer cardId);
+
+    /** Issues a card without an application. A pending application from this learner is approved with it. */
+    MemberCardResponse create(UUID adminId, MemberCardCreateRequest request);
+
+    MemberCardResponse update(Integer cardId, UUID adminId, MemberCardUpdateRequest request);
+
+    /** Only for a card with no transactions: the ledger is a money record, so a used card is suspended instead. */
+    void delete(Integer cardId, UUID adminId);
 
     MemberCardTransactionPageResponse findTransactions(Integer cardId, int page, int size);
 
