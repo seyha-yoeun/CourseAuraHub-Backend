@@ -16,5 +16,8 @@ public interface AccountAdminService {
 
     AdminUserStatusResponse unlock(UUID actorId, UUID userId);
 
+    /** Moves an account between learner and instructor. Admin rights can't be granted or removed this way. */
+    AdminUserStatusResponse setRole(UUID actorId, UUID userId, String role);
+
     int revokeAllSessions(UUID actorId, UUID userId);
 }

@@ -304,6 +304,26 @@ public class MemberCardServiceImpl implements MemberCardService {
     }
 
     @Override
+    @Transactional
+    public void creditTopUp(Integer cardId, UUID adminId, BigDecimal amount, String reference, String note) {
+        MemberCard card = lockCard(cardId);
+        requireNotOwnCard(card.getStudent(), adminId);
+        if (transactionRepository.existsByTypeAndReference(MemberCardTransactionType.TOP_UP, reference)) {
+            log.warn("Ignoring repeated top-up for reference={}", reference);
+            return;
+        }
+        record(card, MemberCardTransactionType.TOP_UP, amount, reference, null, note, adminId);
+        notificationService.notifyStudent(
+                card.getStudent().getId(),
+                NotificationType.MEMBER_CARD,
+                "Member card topped up",
+                "%s %s. Your balance is now %s.".formatted(
+                        amount.toPlainString(), paymentProperties.currency(), card.getBalance().toPlainString()),
+                LINK
+        );
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public void requireUsableCard(String email) {
         MemberCard card = learnerAccountService.findCurrentStudent(email)

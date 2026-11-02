@@ -14,6 +14,9 @@ public interface LessonProgressService {
 
     LessonProgressResponse markIncomplete(String email, Integer lessonId);
 
+    /** Completes a lesson for a learner after staff passed their work. */
+    void completeForStudent(Integer studentId, Integer lessonId);
+
     /** Remembers where the learner stopped in a video. */
     LessonPositionResponse savePosition(String email, Integer lessonId, int positionSeconds);
 

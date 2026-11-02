@@ -109,8 +109,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhooks/*").permitAll()
                         // Telegram webhook, authenticated by its secret header in the controller
                         .requestMatchers(HttpMethod.POST, "/api/v1/telegram/webhook").permitAll()
+                        // Instructor workspace; each course is checked against its owner in the service
+                        .requestMatchers("/api/v1/instructor/**").hasAnyRole("ADMIN", "INSTRUCTOR")
+                        .requestMatchers("/api/v1/admin/lessons/*/quiz").hasAnyRole("ADMIN", "INSTRUCTOR")
                         // Account administration
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        // The category list the catalog and course forms read
+                        .requestMatchers(HttpMethod.GET, "/api/v1/categories").permitAll()
                         // Client-safe platform branding
                         .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").permitAll()
                         // Admin-only management resources
@@ -124,7 +129,14 @@ public class SecurityConfig {
                                 "/api/v1/settings",
                                 "/api/v1/settings/**"
                         ).hasRole("ADMIN")
-                        // Course writes are admin-only, reads are the public catalog
+                        // Curriculum writes: @PreAuthorize limits instructors to their own courses
+                        .requestMatchers(HttpMethod.POST, "/api/v1/courses/*/sections/**", "/api/v1/courses/*/lessons/**")
+                        .hasAnyRole("ADMIN", "INSTRUCTOR")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/courses/*/sections/**", "/api/v1/courses/*/lessons/**")
+                        .hasAnyRole("ADMIN", "INSTRUCTOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/courses/*/sections/**", "/api/v1/courses/*/lessons/**")
+                        .hasAnyRole("ADMIN", "INSTRUCTOR")
+                        // Other course writes are admin-only, reads are the public catalog
                         .requestMatchers(HttpMethod.POST, "/api/v1/courses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/courses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/courses/**").hasRole("ADMIN")

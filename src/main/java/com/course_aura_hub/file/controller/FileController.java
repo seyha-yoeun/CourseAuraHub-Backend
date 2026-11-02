@@ -34,15 +34,15 @@ public class FileController {
     @PostMapping
     @Operation(
             summary = "Start an upload",
-            description = "Returns a short-lived URL to PUT the file to. Purposes: AVATAR, plus COURSE_THUMBNAIL and "
-                    + "LESSON_CONTENT for admins."
+            description = "Returns a short-lived URL to PUT the file to. Purposes: AVATAR, ASSIGNMENT_SUBMISSION and "
+                    + "TOP_UP_RECEIPT, plus COURSE_THUMBNAIL and LESSON_CONTENT for admins and instructors."
     )
     public ResponseEntity<ApiResponse<FileUploadResponse>> startUpload(
             @Valid @RequestBody FileUploadRequest request,
             Authentication authentication
     ) {
         FileUploadResponse response = fileService.startUpload(
-                authentication.getName(), SecurityUtils.isAdmin(authentication), request);
+                authentication.getName(), SecurityUtils.isStaff(authentication), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
     }
 

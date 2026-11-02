@@ -11,6 +11,10 @@ public enum NotificationType {
     NEW_ENROLLMENT,
     COURSE_COMPLETED,
     MEMBER_CARD,
+    LESSON_QUESTION,
+    ASSIGNMENT,
+    COURSE_REVIEW,
+    COURSE_REMINDER,
     WEEKLY_REPORT;
 
     public String apiValue() {

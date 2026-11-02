@@ -53,15 +53,15 @@ public class QuizController {
     }
 
     @GetMapping("/api/v1/admin/lessons/{lessonId}/quiz")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Get a quiz with its answers", description = "Admin-only.")
+    @PreAuthorize("@courseAccess.canManageLesson(authentication, #lessonId)")
+    @Operation(summary = "Get a quiz with its answers", description = "Admins and the course's instructor.")
     public ResponseEntity<ApiResponse<QuizAdminResponse>> findForAdmin(@PathVariable Integer lessonId) {
         return ResponseEntity.ok(ApiResponse.success(quizService.findForAdmin(lessonId)));
     }
 
     @PutMapping("/api/v1/admin/lessons/{lessonId}/quiz")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Save a quiz", description = "Admin-only. Replaces the questions; past attempts are kept.")
+    @PreAuthorize("@courseAccess.canManageLesson(authentication, #lessonId)")
+    @Operation(summary = "Save a quiz", description = "Admins and the course's instructor. Replaces the questions; past attempts are kept.")
     public ResponseEntity<ApiResponse<QuizAdminResponse>> save(
             @PathVariable Integer lessonId,
             @Valid @RequestBody QuizAdminRequest request

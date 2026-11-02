@@ -20,6 +20,16 @@ public interface CourseRepository extends JpaRepository<Course, Integer>, JpaSpe
 
     Optional<Course> findBySlug(String slug);
 
+    long countByCategory(String category);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("update Course c set c.category = :newName where c.category = :oldName")
+    int renameCategory(@Param("oldName") String oldName, @Param("newName") String newName);
+
+    List<Course> findByOwnerIdOrderByCreatedAtDescIdDesc(java.util.UUID ownerId);
+
+    List<Course> findByStatusOrderByUpdatedAtAscIdAsc(com.course_aura_hub.course.model.CourseStatus status);
+
     boolean existsBySlug(String slug);
 
     long countByStatus(CourseStatus status);
