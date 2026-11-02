@@ -4,6 +4,8 @@ import com.course_aura_hub.file.dto.FileUploadRequest;
 import com.course_aura_hub.file.dto.FileUploadResponse;
 import com.course_aura_hub.file.dto.StoredFileResponse;
 
+import com.course_aura_hub.file.model.FilePurpose;
+
 import java.util.UUID;
 
 public interface FileService {
@@ -18,6 +20,12 @@ public interface FileService {
 
     /** The value to store for a lesson: a signed link sent back by the edit form becomes its reference again. */
     String toStoredUrl(String contentUrl);
+
+    /**
+     * Refuses a storage:// reference unless this user uploaded it for this purpose. Signed links are handed
+     * out for stored references, so without this anyone could point a record at another person's private file.
+     */
+    void requireOwned(String reference, String email, FilePurpose purpose);
 
     /** Marks a replaced file for cleanup, if it is one this user uploaded. Other URLs are ignored. */
     void release(String url, UUID userId);

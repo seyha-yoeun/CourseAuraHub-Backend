@@ -2,6 +2,7 @@ package com.course_aura_hub.curriculum.controller;
 
 import com.course_aura_hub.common.dto.ApiResponse;
 import com.course_aura_hub.common.security.SecurityUtils;
+import com.course_aura_hub.course.service.CourseAccess;
 import com.course_aura_hub.curriculum.dto.CurriculumResponse;
 import com.course_aura_hub.curriculum.dto.LessonCreateRequest;
 import com.course_aura_hub.curriculum.dto.LessonResponse;
@@ -32,10 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/courses/{slug}")
 @RequiredArgsConstructor
-@Tag(name = "Curriculum", description = "Course sections and lessons. Reads for learners, writes for admins.")
+@Tag(name = "Curriculum", description = "Course sections and lessons. Reads for learners, writes for admins and the course's instructor.")
 public class CurriculumController {
 
     private final CurriculumService curriculumService;
+    private final CourseAccess courseAccess;
 
     @GetMapping("/curriculum")
     @Operation(
@@ -50,13 +52,13 @@ public class CurriculumController {
         return ResponseEntity.ok(ApiResponse.success(curriculumService.getCurriculum(
                 slug,
                 SecurityUtils.emailOf(authentication),
-                SecurityUtils.isAdmin(authentication)
+                courseAccess.canManage(authentication, slug)
         )));
     }
 
     @PostMapping("/sections")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Create section", description = "Admin-only. Appends to the end when no position is given.")
+    @PreAuthorize("@courseAccess.canManage(authentication, #slug)")
+    @Operation(summary = "Create section", description = "Admins and the course's instructor. Appends to the end when no position is given.")
     public ResponseEntity<ApiResponse<SectionResponse>> createSection(
             @PathVariable String slug,
             @Valid @RequestBody SectionCreateRequest request
@@ -67,8 +69,8 @@ public class CurriculumController {
     }
 
     @PutMapping("/sections/{sectionId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Update section", description = "Admin-only partial update.")
+    @PreAuthorize("@courseAccess.canManage(authentication, #slug)")
+    @Operation(summary = "Update section", description = "Admins and the course's instructor. Partial update.")
     public ResponseEntity<ApiResponse<SectionResponse>> updateSection(
             @PathVariable String slug,
             @PathVariable Integer sectionId,
@@ -81,8 +83,8 @@ public class CurriculumController {
     }
 
     @DeleteMapping("/sections/{sectionId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Delete section", description = "Admin-only. Deletes the section and its lessons.")
+    @PreAuthorize("@courseAccess.canManage(authentication, #slug)")
+    @Operation(summary = "Delete section", description = "Admins and the course's instructor. Deletes the section and its lessons.")
     public ResponseEntity<ApiResponse<Void>> deleteSection(@PathVariable String slug, @PathVariable Integer sectionId) {
         log.info("Received delete section request courseSlug={} sectionId={}", slug, sectionId);
         curriculumService.deleteSection(slug, sectionId);
@@ -90,13 +92,15 @@ public class CurriculumController {
     }
 
     @PostMapping("/sections/{sectionId}/lessons")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Create lesson", description = "Admin-only. Updates the course's lesson and hour totals.")
+    @PreAuthorize("@courseAccess.canManage(authentication, #slug)")
+    @Operation(summary = "Create lesson", description = "Admins and the course's instructor. Updates the course's lesson and hour totals.")
     public ResponseEntity<ApiResponse<LessonResponse>> createLesson(
             @PathVariable String slug,
             @PathVariable Integer sectionId,
-            @Valid @RequestBody LessonCreateRequest request
+            @Valid @RequestBody LessonCreateRequest request,
+            Authentication authentication
     ) {
+        courseAccess.requireUsableFile(authentication, request.contentUrl(), null);
         log.info("Received create lesson request courseSlug={} sectionId={}", slug, sectionId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
@@ -106,13 +110,15 @@ public class CurriculumController {
     }
 
     @PutMapping("/lessons/{lessonId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Update lesson", description = "Admin-only partial update.")
+    @PreAuthorize("@courseAccess.canManage(authentication, #slug)")
+    @Operation(summary = "Update lesson", description = "Admins and the course's instructor. Partial update.")
     public ResponseEntity<ApiResponse<LessonResponse>> updateLesson(
             @PathVariable String slug,
             @PathVariable Integer lessonId,
-            @Valid @RequestBody LessonUpdateRequest request
+            @Valid @RequestBody LessonUpdateRequest request,
+            Authentication authentication
     ) {
+        courseAccess.requireUsableFile(authentication, request.contentUrl(), lessonId);
         return ResponseEntity.ok(ApiResponse.success(
                 "Lesson updated successfully",
                 curriculumService.updateLesson(slug, lessonId, request)
@@ -120,8 +126,8 @@ public class CurriculumController {
     }
 
     @DeleteMapping("/lessons/{lessonId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Delete lesson", description = "Admin-only. Updates course totals and learner completion.")
+    @PreAuthorize("@courseAccess.canManage(authentication, #slug)")
+    @Operation(summary = "Delete lesson", description = "Admins and the course's instructor. Updates course totals and learner completion.")
     public ResponseEntity<ApiResponse<Void>> deleteLesson(@PathVariable String slug, @PathVariable Integer lessonId) {
         log.info("Received delete lesson request courseSlug={} lessonId={}", slug, lessonId);
         curriculumService.deleteLesson(slug, lessonId);

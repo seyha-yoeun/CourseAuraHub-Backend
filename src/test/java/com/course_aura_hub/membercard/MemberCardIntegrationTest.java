@@ -464,4 +464,91 @@ class MemberCardIntegrationTest extends LearnerIntegrationTestSupport {
         expectSameAmount(balance(learner), BigDecimal.TEN);
         assertThat(ledgerRows(cardId)).isEqualTo(1);
     }
+
+    private ResultActions requestTopUp(TestUser learner, BigDecimal amount) throws Exception {
+        return mockMvc.perform(asJson(learner, post(MINE + "/top-ups"), Map.of("amount", amount, "note", "Paid at the desk")));
+    }
+
+    private int topUpId(TestUser learner, BigDecimal amount) throws Exception {
+        String body = requestTopUp(learner, amount).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        return JsonPath.read(body, "$.data.id");
+    }
+
+    @Test
+    void topUpRequest_movesNoMoneyUntilApprovedAndOnlyOnce() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        int cardId = issueCard(learner, admin);
+        int request = topUpId(learner, BigDecimal.TEN);
+
+        requestTopUp(learner, BigDecimal.ONE).andExpect(status().isConflict());
+        expectSameAmount(balance(learner), BigDecimal.ZERO);
+
+        mockMvc.perform(as(learner, post(ADMIN + "/top-ups/" + request + "/approve"))).andExpect(status().isForbidden());
+        mockMvc.perform(as(admin, post(ADMIN + "/top-ups/" + request + "/approve")))
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+        mockMvc.perform(as(admin, post(ADMIN + "/top-ups/" + request + "/approve"))).andExpect(status().isBadRequest());
+
+        expectSameAmount(balance(learner), BigDecimal.TEN);
+        assertThat(ledgerRows(cardId)).isEqualTo(1);
+    }
+
+    @Test
+    void topUpRequest_canBeRejectedWithAReason() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        issueCard(learner, admin);
+        int request = topUpId(learner, BigDecimal.TEN);
+
+        mockMvc.perform(asJson(admin, post(ADMIN + "/top-ups/" + request + "/reject"), Map.of("note", "No cash received")))
+                .andExpect(jsonPath("$.data.status").value("REJECTED"));
+
+        expectSameAmount(balance(learner), BigDecimal.ZERO);
+        mockMvc.perform(as(learner, get(MINE + "/top-ups")))
+                .andExpect(jsonPath("$.data[0].reviewNote").value("No cash received"));
+        requestTopUp(learner, BigDecimal.ONE).andExpect(status().isCreated());
+    }
+
+    @Test
+    void topUpRequest_needsAnActiveCardAndYourOwnReceipt() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        requestTopUp(registerUser(), BigDecimal.ONE).andExpect(status().isBadRequest());
+        int cardId = issueCard(learner, admin);
+
+        mockMvc.perform(asJson(learner, post(MINE + "/top-ups"),
+                        Map.of("amount", BigDecimal.ONE, "receiptUrl", "storage://private/receipts/not-mine.pdf")))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(asJson(admin, patch(ADMIN + "/" + cardId + "/status"), Map.of("status", "SUSPENDED")))
+                .andExpect(status().isOk());
+        requestTopUp(learner, BigDecimal.ONE).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void adminsCantApproveTheirOwnTopUp() throws Exception {
+        TestUser admin = registerAdmin();
+        TestUser otherAdmin = registerAdmin();
+        issueCard(admin, otherAdmin);
+        int request = topUpId(admin, BigDecimal.TEN);
+
+        mockMvc.perform(as(admin, post(ADMIN + "/top-ups/" + request + "/approve"))).andExpect(status().isForbidden());
+
+        expectSameAmount(balance(admin), BigDecimal.ZERO);
+    }
+
+    @Test
+    void report_addsUpMoneyMovedAndIsForAdmins() throws Exception {
+        TestUser learner = registerUser();
+        TestUser admin = registerAdmin();
+        topUp(admin, issueCard(learner, admin), BigDecimal.TEN);
+
+        mockMvc.perform(as(learner, get(ADMIN + "/report"))).andExpect(status().isForbidden());
+        String body = mockMvc.perform(as(admin, get(ADMIN + "/report").param("days", "7")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.days").value(7))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(new BigDecimal(JsonPath.read(body, "$.data.topUps").toString())).isGreaterThanOrEqualTo(BigDecimal.TEN);
+    }
 }

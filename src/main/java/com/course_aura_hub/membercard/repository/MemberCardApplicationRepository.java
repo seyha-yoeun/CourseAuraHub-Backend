@@ -28,6 +28,8 @@ public interface MemberCardApplicationRepository extends JpaRepository<MemberCar
 
     Optional<MemberCardApplication> findFirstByStudentIdOrderByCreatedAtDescIdDesc(Integer studentId);
 
+    long countByStatus(MemberCardApplicationStatus status);
+
     boolean existsByStudentIdAndStatus(Integer studentId, MemberCardApplicationStatus status);
 
     @EntityGraph(attributePaths = "student")

@@ -118,6 +118,14 @@ app:
     # When the weekly report goes out, if it is switched on in Settings. Default: Mondays at 08:00, server time.
     weekly-cron: ${WEEKLY_REPORT_CRON:0 0 8 * * MON}
 
+  reminders:
+    enabled: ${REMINDERS_ENABLED:true}
+    # Daily at 09:00, server time
+    cron: ${REMINDERS_CRON:0 0 9 * * *}
+    idle-days: ${REMINDER_IDLE_DAYS:7}
+    repeat-days: ${REMINDER_REPEAT_DAYS:14}
+    batch-size: ${REMINDER_BATCH_SIZE:500}
+
   telegram:
     # Bot from @BotFather. A blank token turns Telegram off.
     bot-token: ${TELEGRAM_BOT_TOKEN:}

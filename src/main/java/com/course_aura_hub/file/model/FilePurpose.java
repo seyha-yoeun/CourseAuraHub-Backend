@@ -10,7 +10,9 @@ public enum FilePurpose {
     AVATAR("public/avatars", 5 * FilePurpose.MB, false, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP)),
     COURSE_THUMBNAIL("public/courses", 5 * FilePurpose.MB, true, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP)),
     // Lesson files stay private: paid content is only reachable through a short-lived signed link
-    LESSON_CONTENT("private/lessons", 2048 * FilePurpose.MB, true, Set.of(FileType.MP4, FileType.WEBM, FileType.PDF));
+    LESSON_CONTENT("private/lessons", 2048 * FilePurpose.MB, true, Set.of(FileType.MP4, FileType.WEBM, FileType.PDF)),
+    ASSIGNMENT_SUBMISSION("private/assignments", 25 * FilePurpose.MB, false, Set.of(FileType.PDF, FileType.JPEG, FileType.PNG)),
+    TOP_UP_RECEIPT("private/receipts", 10 * FilePurpose.MB, false, Set.of(FileType.PDF, FileType.JPEG, FileType.PNG, FileType.WEBP));
 
     private static final long MB = 1024L * 1024L;
 

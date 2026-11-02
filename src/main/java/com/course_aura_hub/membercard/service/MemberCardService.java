@@ -48,6 +48,9 @@ public interface MemberCardService {
     /** Safe to repeat: a key already used on this card returns the original result without moving money. */
     MemberCardTransactionResponse adjust(Integer cardId, UUID adminId, MemberCardAdjustmentRequest request);
 
+    /** Adds an approved top-up. The reference makes a repeated approval impossible. */
+    void creditTopUp(Integer cardId, UUID adminId, BigDecimal amount, String reference, String note);
+
     /** Fails early, before an order is opened, when this learner can't pay by card. */
     void requireUsableCard(String email);
 
