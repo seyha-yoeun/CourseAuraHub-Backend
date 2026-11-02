@@ -94,6 +94,14 @@ public class Course {
     @Column(name = "completion_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal completionRate;
 
+    // The instructor who manages this course; null for admin-managed courses
+    @Column(name = "owner_id")
+    private java.util.UUID ownerId;
+
+    // Why an admin sent the course back
+    @Column(name = "review_note", columnDefinition = "text")
+    private String reviewNote;
+
     @Column(name = "created_at", nullable = false)
     private LocalDate createdAt;
 

@@ -28,6 +28,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.course_aura_hub.assignment.model.Assignment;
+import com.course_aura_hub.assignment.model.AssignmentSubmission;
+import com.course_aura_hub.assignment.repository.AssignmentRepository;
+import com.course_aura_hub.assignment.repository.AssignmentSubmissionRepository;
 
 import java.time.LocalDate;
 import java.util.Collection;
@@ -51,6 +55,8 @@ public class LessonProgressServiceImpl implements LessonProgressService {
     private final CertificateService certificateService;
     private final QuizQuestionRepository quizQuestionRepository;
     private final QuizAttemptRepository quizAttemptRepository;
+    private final AssignmentRepository assignmentRepository;
+    private final AssignmentSubmissionRepository submissionRepository;
 
     @Override
     @Transactional
@@ -62,6 +68,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
 
         if (lessonProgressRepository.findByStudentIdAndLessonId(student.getId(), lessonId).isEmpty()) {
             requirePassedQuiz(lesson, student);
+            requirePassedAssignment(lesson, student);
             lessonProgressRepository.save(LessonProgress.builder()
                     .student(student)
                     .lesson(lesson)
@@ -82,6 +89,37 @@ public class LessonProgressServiceImpl implements LessonProgressService {
                 && !quizAttemptRepository.existsByStudentIdAndLessonIdAndPassedTrue(student.getId(), lesson.getId())) {
             throw new BusinessRuleException("Pass the quiz to complete this lesson");
         }
+    }
+
+    /** A required assignment is only completed by a passing grade, which finishes the lesson by itself. */
+    private void requirePassedAssignment(Lesson lesson, Student student) {
+        assignmentRepository.findByLessonId(lesson.getId())
+                .filter(Assignment::isRequired)
+                .filter(assignment -> submissionRepository
+                        .findByAssignmentIdAndStudentId(assignment.getId(), student.getId())
+                        .filter(AssignmentSubmission::passed)
+                        .isEmpty())
+                .ifPresent(assignment -> {
+                    throw new BusinessRuleException("Pass the assignment to complete this lesson");
+                });
+    }
+
+    @Override
+    @Transactional
+    public void completeForStudent(Integer studentId, Integer lessonId) {
+        Lesson lesson = findLesson(lessonId);
+        Course course = lesson.getSection().getCourse();
+        // Someone who has since left the course keeps their grade but has no progress to record
+        studentCourseRepository.findByStudentIdAndCourseId(studentId, course.getId()).ifPresent(studentCourse -> {
+            if (lessonProgressRepository.findByStudentIdAndLessonId(studentId, lessonId).isEmpty()) {
+                lessonProgressRepository.save(LessonProgress.builder()
+                        .student(studentCourse.getStudent())
+                        .lesson(lesson)
+                        .build());
+                lessonWatchPositionRepository.deleteByStudentIdAndLessonId(studentId, lessonId);
+            }
+            buildResponse(lessonId, true, course, studentCourse);
+        });
     }
 
     @Override

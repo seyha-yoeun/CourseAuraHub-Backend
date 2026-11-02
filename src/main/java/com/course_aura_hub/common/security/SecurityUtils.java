@@ -29,4 +29,13 @@ public final class SecurityUtils {
     public static boolean isAdmin(Authentication authentication) {
         return hasRole(authentication, "ADMIN");
     }
+
+    public static boolean isInstructor(Authentication authentication) {
+        return hasRole(authentication, "INSTRUCTOR");
+    }
+
+    /** Admins and instructors. Instructors are limited to their own courses by {@code CourseAccess}. */
+    public static boolean isStaff(Authentication authentication) {
+        return isAdmin(authentication) || isInstructor(authentication);
+    }
 }

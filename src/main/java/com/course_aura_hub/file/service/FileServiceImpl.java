@@ -50,7 +50,7 @@ public class FileServiceImpl implements FileService {
     public FileUploadResponse startUpload(String email, boolean admin, FileUploadRequest request) {
         FilePurpose purpose = FilePurpose.fromValue(request.purpose());
         if (purpose.adminOnly() && !admin) {
-            throw new ForbiddenActionException("Only admins can upload this file");
+            throw new ForbiddenActionException("Only staff can upload this file");
         }
         FileType type = FileType.fromContentType(request.contentType())
                 .filter(purpose.allowedTypes()::contains)
@@ -135,6 +135,20 @@ public class FileServiceImpl implements FileService {
         String key = contentUrl.substring(bucketUrl.length());
         int query = key.indexOf('?');
         return REFERENCE_PREFIX + (query < 0 ? key : key.substring(0, query));
+    }
+
+    @Override
+    public void requireOwned(String reference, String email, FilePurpose purpose) {
+        UUID userId = findUserId(email);
+        boolean owned = reference != null
+                && reference.startsWith(REFERENCE_PREFIX)
+                && fileRepository.findByObjectKey(reference.substring(REFERENCE_PREFIX.length()))
+                .filter(file -> userId.equals(file.getUploadedBy()))
+                .filter(file -> file.getPurpose() == purpose && file.getStatus() == FileStatus.READY)
+                .isPresent();
+        if (!owned) {
+            throw new BusinessRuleException("This file can't be used here");
+        }
     }
 
     @Override

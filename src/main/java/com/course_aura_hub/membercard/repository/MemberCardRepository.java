@@ -16,6 +16,11 @@ public interface MemberCardRepository extends JpaRepository<MemberCard, Integer>
 
     Optional<MemberCard> findByStudentId(Integer studentId);
 
+    long countByStatus(com.course_aura_hub.membercard.model.MemberCardStatus status);
+
+    @Query("select coalesce(sum(c.balance), 0) from MemberCard c")
+    java.math.BigDecimal sumBalances();
+
     boolean existsByStudentId(Integer studentId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
