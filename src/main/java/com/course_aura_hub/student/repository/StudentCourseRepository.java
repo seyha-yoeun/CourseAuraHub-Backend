@@ -35,6 +35,9 @@ public interface StudentCourseRepository extends JpaRepository<StudentCourse, St
 
     Optional<StudentCourse> findByStudentIdAndCourseId(Integer studentId, Integer courseId);
 
+    @Query("select sc from StudentCourse sc join fetch sc.student where sc.course.id = :courseId order by sc.student.name")
+    List<StudentCourse> findWithStudentByCourseId(@Param("courseId") Integer courseId);
+
     boolean existsByStudentIdAndCourseId(Integer studentId, Integer courseId);
 
     @Query("""

@@ -51,6 +51,12 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
+    public void notifyUsers(Collection<UUID> userIds, NotificationType type, String title, String message, String link) {
+        save(List.copyOf(userIds), type, title, message, link);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public void notifyAdmins(NotificationType type, String title, String message, String link) {
         save(userRepository.findEnabledIdsByRole(Role.ROLE_ADMIN), type, title, message, link);
     }

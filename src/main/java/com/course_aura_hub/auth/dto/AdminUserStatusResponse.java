@@ -13,5 +13,6 @@ public record AdminUserStatusResponse(
         boolean emailVerified,
         boolean mfaEnabled,
         Instant lockedUntil,
-        int failedLoginAttempts
+        int failedLoginAttempts,
+        String role
 ) {}

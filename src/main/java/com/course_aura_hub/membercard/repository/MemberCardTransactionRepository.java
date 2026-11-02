@@ -16,5 +16,19 @@ public interface MemberCardTransactionRepository extends JpaRepository<MemberCar
 
     boolean existsByCardId(Integer cardId);
 
+    @org.springframework.data.jpa.repository.Query("""
+            select t.type as type, coalesce(sum(t.amount), 0) as total
+            from MemberCardTransaction t
+            where t.createdAt >= :since
+            group by t.type
+            """)
+    java.util.List<TypeTotal> sumByTypeSince(@org.springframework.data.repository.query.Param("since") java.time.Instant since);
+
+    interface TypeTotal {
+        MemberCardTransactionType getType();
+
+        java.math.BigDecimal getTotal();
+    }
+
     boolean existsByTypeAndReference(MemberCardTransactionType type, String reference);
 }

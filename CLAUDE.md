@@ -39,6 +39,12 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `cart` | Cart and multi-course checkout | `/api/v1/me/cart` |
 | `quiz` | Graded quizzes for QUIZ lessons | `/api/v1/me/lessons/{id}/quiz`, `/api/v1/admin/lessons/{id}/quiz` (ADMIN) |
 | `review` | Course reviews and ratings | `/api/v1/courses/{slug}/reviews`, `/api/v1/me/courses/{slug}/review` |
+| `discussion` | Lesson questions and answers, staff inbox | `/api/v1/me/lessons/{id}/questions`, `/api/v1/me/questions`, `/api/v1/instructor/questions` |
+| `note` | Private lesson notes and video bookmarks | `/api/v1/me/lessons/{id}/notes`, `/api/v1/me/notes` |
+| `category` | Managed course categories | `/api/v1/categories` (public), `/api/v1/admin/categories` |
+| `assignment` | Assignments, submissions and grading | `/api/v1/me/lessons/{id}/assignment`, `/api/v1/instructor/lessons/{id}/assignment`, `/api/v1/instructor/submissions` |
+| `instructor` | An instructor's own courses, and the admin review that publishes them | `/api/v1/instructor`, `/api/v1/admin/course-reviews` |
+| `reminder` | Nudges to return to an unfinished course | `/api/v1/me/reminders` |
 | `common` | `ApiResponse`, shared exceptions + `DomainExceptionHandler`, `SecurityUtils` | — |
 | `config` | Demo data seeder, domain config properties | — |
 
@@ -67,11 +73,14 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013`, `V0017` and `V0036` seed sample data. Flyway runs each once, so add new seed data in a new migration and never edit an applied one.
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
 
+- **Course access**: decide who manages a course with `CourseAccess` (`@courseAccess` in `@PreAuthorize`), not `isAdmin`: instructors manage only courses with their `owner_id`. Courses without an owner are admin-managed. Only admin approval publishes an instructor's course, so never let the instructor routes set a status. Instructors must never see learner emails or spending.
+- **Private file references**: any endpoint that stores a `storage://` value from a caller must call `FileService.requireOwned` first (`CourseAccess.requireUsableFile` for lessons). Stored references get signed links, so skipping this lets someone read another person's private file.
+- **Top-up requests**: a request moves no money. Approval credits the card through `MemberCardService.creditTopUp`, with `TOPUP-{id}` as the ledger reference.
+- **Required assignments**: a lesson with a required assignment can only be completed by a passing grade, which `AssignmentService.grade` applies through `LessonProgressService.completeForStudent`.
 - **Logging**: the console stays human-readable; `logs/course-aura-hub.log` is Logstash JSON and Alloy ships it to Loki (`docs/logging.md`). `RequestLoggingFilter` logs method, path, status and duration and sets the `requestId` MDC value. Never add query strings, headers, cookies or bodies to it. `docker compose down -v` also deletes Postgres data.
 
 ## Roadmap (not yet built)
 
 1. A real payment provider behind `PaymentGateway`; only the dev-only `fake` gateway exists, so paid checkout is off by default.
-2. Lesson Q&A, discussions and personal notes.
-3. Categories and instructors as real entities, plus instructor profile pages.
-4. Recommendations by tags and category.
+2. Public instructor profile pages.
+3. Recommendations by tags and category.

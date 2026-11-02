@@ -3,6 +3,7 @@ package com.course_aura_hub.auth.service;
 import com.course_aura_hub.auth.dto.AdminUserStatusResponse;
 import com.course_aura_hub.auth.exception.AuthException;
 import com.course_aura_hub.auth.model.AuditEventType;
+import com.course_aura_hub.auth.model.Role;
 import com.course_aura_hub.auth.model.SessionRevocationReason;
 import com.course_aura_hub.auth.model.User;
 import com.course_aura_hub.auth.repository.UserRepository;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -79,6 +81,35 @@ public class AccountAdminServiceImpl implements AccountAdminService {
         return refreshSessionService.revokeAllSessions(userId, SessionRevocationReason.ADMIN_REVOKED);
     }
 
+    @Override
+    @Transactional
+    public AdminUserStatusResponse setRole(UUID actorId, UUID userId, String role) {
+        if (actorId.equals(userId)) {
+            throw new AuthException("Administrators cannot change their own role");
+        }
+        Role target = switch (role.trim().toUpperCase(Locale.ROOT)) {
+            case "USER", "ROLE_USER" -> Role.ROLE_USER;
+            case "INSTRUCTOR", "ROLE_INSTRUCTOR" -> Role.ROLE_INSTRUCTOR;
+            // Admins are appointed through configuration, so a stolen admin session can't mint more
+            default -> throw new AuthException("Role must be USER or INSTRUCTOR");
+        };
+        User user = userRepository.findByIdForUpdate(userId).orElseThrow(AccountAdminServiceImpl::notFound);
+        if (user.getRole() == Role.ROLE_ADMIN) {
+            throw new AuthException("An administrator's role can't be changed here");
+        }
+        if (user.getRole() == target) {
+            return toResponse(user);
+        }
+        user.setRole(target);
+        userRepository.save(user);
+        log.info("Admin {} set role={} for account {}", actorId, target, user.getEmail());
+        auditService.record(AuthAuditEntry.success(AuditEventType.ACCOUNT_STATUS_CHANGED, user)
+                .reason(target.name())
+                .metadata(Map.of("actorId", actorId.toString()))
+                .build());
+        return toResponse(user);
+    }
+
     private static AdminUserStatusResponse toResponse(User user) {
         return new AdminUserStatusResponse(
                 user.getId(),
@@ -87,7 +118,8 @@ public class AccountAdminServiceImpl implements AccountAdminService {
                 user.isEmailVerified(),
                 user.isMfaEnabled(),
                 user.getLockedUntil(),
-                user.getFailedLoginAttempts()
+                user.getFailedLoginAttempts(),
+                user.getRole().name()
         );
     }
 

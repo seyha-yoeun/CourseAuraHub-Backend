@@ -1,5 +1,6 @@
 package com.course_aura_hub.auth.controller;
 
+import com.course_aura_hub.auth.dto.AccountRoleUpdateRequest;
 import com.course_aura_hub.auth.dto.AccountStatusUpdateRequest;
 import com.course_aura_hub.auth.dto.AdminUserStatusResponse;
 import com.course_aura_hub.auth.security.AuthUserPrincipal;
@@ -45,6 +46,17 @@ public class AccountAdminController {
     ) {
         return ResponseEntity.ok(ApiResponse.success("Account status updated",
                 accountAdminService.setEnabled(admin.getUserId(), userId, request.enabled())));
+    }
+
+    @PatchMapping("/role")
+    @Operation(summary = "Make an account a learner or an instructor")
+    public ResponseEntity<ApiResponse<AdminUserStatusResponse>> setRole(
+            @PathVariable UUID userId,
+            @Valid @RequestBody AccountRoleUpdateRequest request,
+            @AuthenticationPrincipal AuthUserPrincipal admin
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Account role updated",
+                accountAdminService.setRole(admin.getUserId(), userId, request.role())));
     }
 
     @PostMapping("/unlock")

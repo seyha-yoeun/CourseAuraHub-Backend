@@ -64,6 +64,11 @@ public class Student {
     @Column(name = "status", nullable = false, columnDefinition = "text")
     private StudentStatus status;
 
+    // Whether this learner wants nudges about unfinished courses
+    @Builder.Default
+    @Column(name = "reminders_enabled", nullable = false)
+    private boolean remindersEnabled = true;
+
     @Column(name = "country", nullable = false, columnDefinition = "text")
     private String country;
 

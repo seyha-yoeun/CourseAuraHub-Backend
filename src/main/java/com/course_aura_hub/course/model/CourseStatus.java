@@ -6,6 +6,8 @@ import java.util.Locale;
 
 public enum CourseStatus {
     DRAFT,
+    // An instructor sent it for approval; learners can't see it yet
+    PENDING_REVIEW,
     PUBLISHED,
     ARCHIVED;
 
