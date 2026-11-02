@@ -22,3 +22,13 @@ jobs:
       # Testcontainers starts its own PostgreSQL, so no secrets or services are needed here
       - name: Build and test
         run: sh ./mvnw -B verify
+      # Annotations are readable without downloading the logs. GitHub keeps ten of each level.
+      - name: Summarize test failures
+        if: failure()
+        run: |
+          grep -h -A1 -E "<<< (FAILURE|ERROR)" target/surefire-reports/*.txt \
+            | grep -v '^--' | paste - - | cut -c1-400 > failures.txt || true
+          echo "::notice::$(wc -l < failures.txt) tests failed"
+          sed -n '1,10p' failures.txt | sed 's/^/::error::/'
+          sed -n '11,20p' failures.txt | sed 's/^/::warning::/'
+          sed -n '21,29p' failures.txt | sed 's/^/::notice::/'
