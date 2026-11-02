@@ -1,10 +1,8 @@
 package com.course_aura_hub.membercard;
 
-import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.learner.LearnerIntegrationTestSupport;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
 
 import java.math.BigDecimal;
@@ -30,11 +28,9 @@ class MemberCardIntegrationTest extends LearnerIntegrationTestSupport {
     private static final String ADMIN = "/api/v1/admin/member-cards";
     private static final String SECOND_PAID_COURSE = "spring-boot-microservices";
 
-    @Autowired
-    private CourseRepository courseRepository;
-
-    private BigDecimal price(String slug) {
-        return courseRepository.findBySlug(slug).orElseThrow().currentPrice().price();
+    private BigDecimal price(String slug) throws Exception {
+        String body = mockMvc.perform(get("/api/v1/courses/" + slug)).andReturn().getResponse().getContentAsString();
+        return new BigDecimal(JsonPath.read(body, "$.data.price").toString());
     }
 
     private ResultActions apply(TestUser user) throws Exception {
