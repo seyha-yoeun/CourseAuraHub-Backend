@@ -31,6 +31,7 @@ import com.course_aura_hub.order.payment.PaymentMethod;
 import com.course_aura_hub.order.payment.PaymentSession;
 import com.course_aura_hub.order.repository.OrderGroupRepository;
 import com.course_aura_hub.order.repository.OrderRepository;
+import com.course_aura_hub.settings.service.SettingsService;
 import com.course_aura_hub.student.model.Student;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
 import com.course_aura_hub.student.repository.StudentRepository;
@@ -71,6 +72,8 @@ public class OrderServiceImpl implements OrderService {
     private final CartItemRepository cartItemRepository;
     private final NotificationService notificationService;
     private final MemberCardService memberCardService;
+    private final ReceiptPdfRenderer receiptPdfRenderer;
+    private final SettingsService settingsService;
 
     @Override
     @Transactional
@@ -361,6 +364,33 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public OrderResponse findMine(String email, String orderNumber) {
         return toResponse(findOwned(email, orderNumber));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] renderMyReceipt(String email, String orderNumber) {
+        return renderReceipt(findOwned(email, orderNumber));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] renderReceipt(String orderNumber) {
+        return renderReceipt(orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> ResourceNotFoundException.of("Order", orderNumber)));
+    }
+
+    private byte[] renderReceipt(Order order) {
+        if (order.getStatus() != OrderStatus.PAID && order.getStatus() != OrderStatus.REFUNDED) {
+            throw new BusinessRuleException("A receipt is only available for paid orders");
+        }
+        Student student = order.getStudent();
+        ReceiptPdfRenderer.ReceiptDetails details = new ReceiptPdfRenderer.ReceiptDetails(
+                settingsService.getPublicSettings().platformName(),
+                student.getName(),
+                student.getEmail(),
+                order.getProviderReference()
+        );
+        return receiptPdfRenderer.render(order, details);
     }
 
     @Override

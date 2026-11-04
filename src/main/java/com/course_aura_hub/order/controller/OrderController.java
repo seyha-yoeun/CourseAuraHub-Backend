@@ -10,7 +10,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequiredArgsConstructor
@@ -76,6 +80,16 @@ public class OrderController {
         return ResponseEntity.ok(ApiResponse.success(orderService.cancelMine(authentication.getName(), orderNumber)));
     }
 
+    @GetMapping("/api/v1/me/orders/{orderNumber}/receipt")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Download my receipt", description = "PDF receipt for a paid or refunded order.")
+    public ResponseEntity<byte[]> myReceipt(
+            @PathVariable String orderNumber,
+            Authentication authentication
+    ) {
+        return pdf(orderNumber, orderService.renderMyReceipt(authentication.getName(), orderNumber));
+    }
+
     @PostMapping("/api/v1/payments/webhooks/{provider}")
     @Operation(summary = "Payment provider webhook", description = "Public. Authenticated by the provider's signature.")
     public ResponseEntity<ApiResponse<Void>> webhook(
@@ -107,5 +121,20 @@ public class OrderController {
     )
     public ResponseEntity<ApiResponse<OrderResponse>> refund(@PathVariable String orderNumber) {
         return ResponseEntity.ok(ApiResponse.success(checkoutFacade.refund(orderNumber)));
+    }
+
+    @GetMapping("/api/v1/admin/orders/{orderNumber}/receipt")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Download an order's receipt", description = "Admin-only. PDF receipt for a paid or refunded order.")
+    public ResponseEntity<byte[]> receipt(@PathVariable String orderNumber) {
+        return pdf(orderNumber, orderService.renderReceipt(orderNumber));
+    }
+
+    private static ResponseEntity<byte[]> pdf(String orderNumber, byte[] body) {
+        String filename = "receipt-" + orderNumber.trim().toUpperCase(Locale.ROOT) + ".pdf";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                .body(body);
     }
 }
