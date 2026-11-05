@@ -9,6 +9,7 @@ public enum NotificationType {
     REFUND_REQUEST,
     CERTIFICATE_ISSUED,
     NEW_LESSON,
+    COURSE_UPDATED,
     NEW_ENROLLMENT,
     COURSE_COMPLETED,
     MEMBER_CARD,
