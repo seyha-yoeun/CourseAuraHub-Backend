@@ -58,4 +58,27 @@ public class Lesson {
     @Builder.Default
     @Column(name = "quiz_pass_percent", nullable = false)
     private Integer quizPassPercent = 70;
+
+    /** Attempts a learner gets, before any granted by staff; null is unlimited. */
+    @Column(name = "quiz_max_attempts")
+    private Integer quizMaxAttempts;
+
+    /** Wait after a failed attempt before the next one; null is none. */
+    @Column(name = "quiz_retry_cooldown_minutes")
+    private Integer quizRetryCooldownMinutes;
+
+    @Column(name = "quiz_time_limit_minutes")
+    private Integer quizTimeLimitMinutes;
+
+    /** Questions drawn at random for each attempt; null asks every question. */
+    @Column(name = "quiz_questions_per_attempt")
+    private Integer quizQuestionsPerAttempt;
+
+    @Column(name = "quiz_shuffle", nullable = false)
+    private boolean quizShuffle;
+
+    /** Timed, pooled and shuffled quizzes are taken through a server-side session. */
+    public boolean quizNeedsSession() {
+        return quizTimeLimitMinutes != null || quizQuestionsPerAttempt != null || quizShuffle;
+    }
 }
