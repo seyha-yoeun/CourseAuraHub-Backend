@@ -17,6 +17,13 @@ public interface CourseReviewRepository extends JpaRepository<CourseReview, Inte
     @EntityGraph(attributePaths = {"student"})
     Page<CourseReview> findByCourseId(Integer courseId, Pageable pageable);
 
+    /** What the public sees: hidden reviews are left out. */
+    @EntityGraph(attributePaths = {"student"})
+    Page<CourseReview> findByCourseIdAndHiddenFalse(Integer courseId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"course"})
+    Optional<CourseReview> findWithCourseById(Integer id);
+
     @EntityGraph(attributePaths = {"student"})
     Optional<CourseReview> findByCourseIdAndStudentId(Integer courseId, Integer studentId);
 
@@ -26,6 +33,6 @@ public interface CourseReviewRepository extends JpaRepository<CourseReview, Inte
 
     long countByStudentId(Integer studentId);
 
-    @Query("select avg(r.rating) from CourseReview r where r.course.id = :courseId")
+    @Query("select avg(r.rating) from CourseReview r where r.course.id = :courseId and r.hidden = false")
     Double averageRating(@Param("courseId") Integer courseId);
 }
