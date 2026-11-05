@@ -1,4 +1,4 @@
--- V0051: Pacing. A sequential course unlocks each lesson once the ones before it are complete;
+-- V0056: Pacing. A sequential course unlocks each lesson once the ones before it are complete;
 -- a lesson with release_after_days opens that many days after the learner enrolled.
 
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS sequential_lessons boolean NOT NULL DEFAULT false;

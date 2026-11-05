@@ -53,6 +53,29 @@ class LessonPacingIntegrationTest extends LearnerIntegrationTestSupport {
     }
 
     @Test
+    void lockedQuizCantBeStartedOrSubmitted() throws Exception {
+        TestUser admin = registerAdmin();
+        String slug = createCourse(admin);
+        int section = createSection(admin, slug);
+        createLesson(admin, slug, section, Map.of("title", "Read first", "type", "article"));
+        int quiz = createLesson(admin, slug, section, Map.of("title", "Check", "type", "quiz"));
+        mockMvc.perform(asJson(admin, put("/api/v1/admin/lessons/" + quiz + "/quiz"), Map.of(
+                        "passPercent", 50, "timeLimitMinutes", 5,
+                        "questions", java.util.List.of(Map.of("prompt", "Q", "options", java.util.List.of(
+                                Map.of("text", "A", "correct", true), Map.of("text", "B", "correct", false)))))))
+                .andExpect(status().isOk());
+        mockMvc.perform(asJson(admin, put("/api/v1/courses/" + slug + "/curriculum/settings"), Map.of("sequentialLessons", true)))
+                .andExpect(status().isOk());
+
+        TestUser learner = registerUser();
+        enroll(learner, slug);
+        mockMvc.perform(as(learner, post("/api/v1/me/lessons/" + quiz + "/quiz/start"))).andExpect(status().isForbidden());
+        mockMvc.perform(as(learner, get("/api/v1/me/lessons/" + quiz + "/quiz"))).andExpect(status().isForbidden());
+        mockMvc.perform(asJson(learner, post("/api/v1/me/lessons/" + quiz + "/quiz/attempts"), Map.of("answers", Map.of(1, 1))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void drippedLesson_opensDaysAfterEnrolling() throws Exception {
         TestUser admin = registerAdmin();
         String slug = createCourse(admin);
