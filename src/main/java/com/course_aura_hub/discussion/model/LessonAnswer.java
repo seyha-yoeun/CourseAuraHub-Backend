@@ -52,6 +52,11 @@ public class LessonAnswer {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Hidden by moderation after a report. */
+    @Builder.Default
+    @Column(name = "hidden", nullable = false)
+    private boolean hidden = false;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
