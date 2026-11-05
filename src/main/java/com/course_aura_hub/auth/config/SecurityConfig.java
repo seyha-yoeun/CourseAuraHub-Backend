@@ -111,7 +111,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/telegram/webhook").permitAll()
                         // Instructor workspace; each course is checked against its owner in the service
                         .requestMatchers("/api/v1/instructor/**").hasAnyRole("ADMIN", "INSTRUCTOR")
-                        .requestMatchers("/api/v1/admin/lessons/*/quiz").hasAnyRole("ADMIN", "INSTRUCTOR")
+                        .requestMatchers("/api/v1/admin/lessons/*/quiz", "/api/v1/admin/lessons/*/quiz/**")
+                        .hasAnyRole("ADMIN", "INSTRUCTOR")
                         // Account administration
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // The category list the catalog and course forms read
