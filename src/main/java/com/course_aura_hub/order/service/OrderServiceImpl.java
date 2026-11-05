@@ -38,6 +38,7 @@ import com.course_aura_hub.student.repository.StudentCourseRepository;
 import com.course_aura_hub.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -75,6 +76,7 @@ public class OrderServiceImpl implements OrderService {
     private final MemberCardService memberCardService;
     private final ReceiptPdfRenderer receiptPdfRenderer;
     private final SettingsService settingsService;
+    private final ApplicationEventPublisher eventPublisher;
     private final PrerequisiteService prerequisiteService;
 
     @Override
@@ -98,7 +100,7 @@ public class OrderServiceImpl implements OrderService {
         prerequisiteService.requireMet(student.getId(), course.getId());
 
         Optional<Order> open = orderRepository
-                .findByStudentIdAndCourseIdAndStatus(student.getId(), course.getId(), OrderStatus.PENDING);
+                .findByStudentIdAndCourseIdAndStatusAndGiftFalse(student.getId(), course.getId(), OrderStatus.PENDING);
         CouponQuote quote = couponService.applyToOrder(
                 couponCode, course, student.getId(), open.map(Order::getId).orElse(null));
         if (quote.finalAmount().signum() > 0 && provider == null) {
@@ -156,7 +158,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         courses.forEach(course -> orderRepository
-                .findByStudentIdAndCourseIdAndStatus(studentId, course.getId(), OrderStatus.PENDING)
+                .findByStudentIdAndCourseIdAndStatusAndGiftFalse(studentId, course.getId(), OrderStatus.PENDING)
                 .ifPresent(this::cancelWithGroup));
         orderRepository.flush();
 
@@ -312,7 +314,9 @@ public class OrderServiceImpl implements OrderService {
         if (order.getStatus() != OrderStatus.PENDING) {
             throw new BusinessRuleException("This order can no longer be paid");
         }
-        if (studentCourseRepository.existsByStudentIdAndCourseId(order.getStudent().getId(), order.getCourse().getId())) {
+        // A gift is for someone else, so the buyer's own enrollment doesn't matter
+        if (!order.isGift()
+                && studentCourseRepository.existsByStudentIdAndCourseId(order.getStudent().getId(), order.getCourse().getId())) {
             throw new DuplicateResourceException("You are already enrolled in this course");
         }
     }
@@ -476,6 +480,12 @@ public class OrderServiceImpl implements OrderService {
         order.setPaidAt(Instant.now());
         order.setCheckoutUrl(null);
 
+        // A gift enrolls nobody yet: its code is issued for the recipient in this transaction
+        if (order.isGift()) {
+            eventPublisher.publishEvent(new GiftOrderPaid(order.getId()));
+            log.info("Gift order={} paid", order.getOrderNumber());
+            return;
+        }
         Integer studentId = order.getStudent().getId();
         Integer courseId = order.getCourse().getId();
         if (studentCourseRepository.existsByStudentIdAndCourseId(studentId, courseId)) {
@@ -484,6 +494,41 @@ public class OrderServiceImpl implements OrderService {
         }
         enrollmentService.create(new EnrollmentCreateRequest(studentId, courseId, order.getAmount(), null));
         log.info("Order={} paid, enrolled studentId={} courseId={}", order.getOrderNumber(), studentId, courseId);
+    }
+
+    @Override
+    @Transactional
+    public Order openGiftOrder(String email, String courseSlug, String currency, String provider,
+                               String recipientEmail, String message) {
+        Integer studentId = learnerAccountService.currentStudent(email).getId();
+        Student student = studentRepository.findByIdForUpdate(studentId)
+                .orElseThrow(() -> ResourceNotFoundException.of("Student", studentId));
+        Course course = courseRepository.findBySlug(courseSlug)
+                .filter(found -> found.getStatus() == CourseStatus.PUBLISHED)
+                .orElseThrow(() -> ResourceNotFoundException.of("Course", courseSlug));
+        BigDecimal price = course.currentPrice().price();
+        if (price.signum() <= 0) {
+            throw new BusinessRuleException("This course is free, so there's nothing to gift. Share the link instead");
+        }
+        if (provider == null) {
+            throw new ServiceUnavailableException("Paid checkout is not available yet");
+        }
+        // Gifts skip the already-enrolled check: you can give a course you own. Coupons are for your own purchases
+        Order order = orderRepository.save(Order.builder()
+                .orderNumber(OrderNumberGenerator.next())
+                .student(student)
+                .course(course)
+                .listAmount(price)
+                .discountAmount(BigDecimal.ZERO)
+                .amount(price)
+                .currency(currency)
+                .status(OrderStatus.PENDING)
+                .provider(provider)
+                .gift(true)
+                .build());
+        // The gift module records who it's for before payment, which may settle in this same checkout
+        eventPublisher.publishEvent(new GiftOrderOpened(order.getId(), recipientEmail, message));
+        return order;
     }
 
     @Override
@@ -524,6 +569,10 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.REFUNDED);
         order.setRefundedAt(Instant.now());
+        if (order.isGift()) {
+            // An unused gift code stops working; a redeemed one keeps the recipient's access
+            eventPublisher.publishEvent(new GiftOrderRefunded(order.getId()));
+        }
         enrollmentRepository.findByStudentIdAndCourseId(order.getStudent().getId(), order.getCourse().getId())
                 .ifPresent(enrollment -> enrollmentService.delete(enrollment.getId()));
         notifyLearner(order, NotificationType.ORDER_REFUNDED, "Order refunded",

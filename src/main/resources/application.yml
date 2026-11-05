@@ -141,6 +141,10 @@ app:
     # Fields an instructor may change on a live course without admin review; anything else waits as a revision
     immediate-fields: ${COURSE_REVISION_IMMEDIATE_FIELDS:tags,thumbnail}
 
+  organizations:
+    # Frontend page that accepts an organization invitation; the token is appended as ?token=
+    invite-url: ${ORGANIZATION_INVITE_URL:http://localhost:3000/organizations/join}
+
   refunds:
     # Learners ask for refunds in the app. Inside the window and below the progress limit they're refunded at once.
     enabled: ${REFUNDS_ENABLED:true}
