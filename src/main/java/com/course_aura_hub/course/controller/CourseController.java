@@ -8,6 +8,7 @@ import com.course_aura_hub.course.dto.CourseSearchCriteria;
 import com.course_aura_hub.course.dto.CourseUpdateRequest;
 import com.course_aura_hub.course.service.CourseService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Slf4j
@@ -41,17 +43,33 @@ public class CourseController {
     @Operation(
             summary = "List courses",
             description = "Public. Visitors and learners receive published courses only, without sales figures. "
-                    + "Admins can filter by any status."
+                    + "Admins can filter by any status. A search is full-text (stemmed, supports \"phrases\" and "
+                    + "-exclusions) with a substring fallback, and is ordered by relevance unless a sort is given. "
+                    + "Price filters use the current price, after any running sale."
     )
     public ResponseEntity<ApiResponse<List<CourseResponse>>> findAll(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String search,
+            @Parameter(description = "revenue, totalStudents, rating, price, title, createdAt, updatedAt or relevance")
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String order,
+            @Parameter(description = "beginner, intermediate or advanced")
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @Parameter(description = "true for free courses only, false for paid only")
+            @RequestParam(required = false) Boolean free,
+            @Parameter(description = "true for courses with a running sale")
+            @RequestParam(required = false) Boolean onSale,
+            @Parameter(description = "0 to 5")
+            @RequestParam(required = false) BigDecimal minRating,
+            @RequestParam(required = false) BigDecimal minHours,
+            @RequestParam(required = false) BigDecimal maxHours,
             Authentication authentication
     ) {
-        CourseSearchCriteria criteria = new CourseSearchCriteria(status, category, search, sort, order);
+        CourseSearchCriteria criteria = new CourseSearchCriteria(status, category, search, sort, order,
+                level, minPrice, maxPrice, free, onSale, minRating, minHours, maxHours);
         boolean includeUnpublished = SecurityUtils.isAdmin(authentication);
         return ResponseEntity.ok(ApiResponse.success(courseService.findAll(criteria, includeUnpublished)));
     }
