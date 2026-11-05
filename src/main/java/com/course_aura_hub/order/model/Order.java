@@ -93,6 +93,11 @@ public class Order {
     @Column(name = "refunded_at")
     private Instant refundedAt;
 
+    /** Bought for someone else: paying issues a gift code instead of enrolling the buyer. */
+    @Builder.Default
+    @Column(name = "gift", nullable = false)
+    private boolean gift = false;
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {

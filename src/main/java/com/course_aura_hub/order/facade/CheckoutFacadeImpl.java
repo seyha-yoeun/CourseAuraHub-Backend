@@ -45,6 +45,23 @@ public class CheckoutFacadeImpl implements CheckoutFacade {
                 paymentProperties.currency(),
                 provider(byCard, gateway)
         );
+        return pay(email, order, byCard, gateway);
+    }
+
+    @Override
+    public OrderResponse checkoutGift(String email, String courseSlug, String paymentMethod, String recipientEmail, String message) {
+        boolean byCard = PaymentMethod.fromValue(paymentMethod) == PaymentMethod.MEMBER_CARD;
+        if (byCard) {
+            memberCardService.requireUsableCard(email);
+        }
+        PaymentGateway gateway = paymentGateway.getIfAvailable();
+        Order order = orderService.openGiftOrder(email, courseSlug, paymentProperties.currency(), provider(byCard, gateway),
+                recipientEmail, message);
+        return pay(email, order, byCard, gateway);
+    }
+
+    /** Settles a free order, charges a member card, or starts a provider payment, outside any transaction. */
+    private OrderResponse pay(String email, Order order, boolean byCard, PaymentGateway gateway) {
         if (order.getAmount().signum() == 0) {
             return orderService.completeFreeOrder(order.getOrderNumber());
         }

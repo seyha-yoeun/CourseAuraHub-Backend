@@ -4,6 +4,7 @@ import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.DuplicateResourceException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.curriculum.repository.LessonProgressRepository;
+import com.course_aura_hub.gift.repository.AccessCodeRepository;
 import com.course_aura_hub.curriculum.repository.LessonRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.notification.model.NotificationType;
@@ -46,6 +47,7 @@ public class RefundRequestServiceImpl implements RefundRequestService {
     private final LessonProgressRepository progressRepository;
     private final NotificationService notificationService;
     private final RefundPolicyProperties policy;
+    private final AccessCodeRepository accessCodeRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -182,6 +184,11 @@ public class RefundRequestServiceImpl implements RefundRequestService {
                 List.of(RefundRequestStatus.PENDING, RefundRequestStatus.REJECTED))) {
             canRequest = false;
             reasons.add("A refund was already requested for this order.");
+        } else if (order.isGift() && accessCodeRepository.findByGiftOrderId(order.getId())
+                .filter(code -> code.getUses() > 0).isPresent()) {
+            // The buyer's own progress says nothing here, and refunding would leave the recipient enrolled for free
+            canRequest = false;
+            reasons.add("This gift has already been redeemed, so it can't be refunded.");
         }
 
         if (canRequest) {

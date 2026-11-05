@@ -20,6 +20,9 @@ public interface OrderService {
      */
     Order openOrder(String email, String courseSlug, String couponCode, String currency, String provider);
 
+    /** An order for a course bought as a gift. Paying it issues a gift code instead of enrolling the buyer. */
+    Order openGiftOrder(String email, String courseSlug, String currency, String provider, String recipientEmail, String message);
+
     /**
      * Opens one order per course in the cart under a single payment. Replaces any open orders for those courses.
      * A coupon applies to one course, see {@code CouponService#chooseCourse}.
