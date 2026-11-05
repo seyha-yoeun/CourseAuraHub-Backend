@@ -1,6 +1,8 @@
 package com.course_aura_hub.review.controller;
 
+import com.course_aura_hub.auth.security.AuthUserPrincipal;
 import com.course_aura_hub.common.dto.ApiResponse;
+import com.course_aura_hub.common.security.Actor;
 import com.course_aura_hub.common.security.SecurityUtils;
 import com.course_aura_hub.review.dto.ReviewPageResponse;
 import com.course_aura_hub.review.dto.ReviewRequest;
@@ -14,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +24,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -36,11 +41,42 @@ public class ReviewController {
             @PathVariable String slug,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "newest") String sort,
             Authentication authentication
     ) {
         return ResponseEntity.ok(ApiResponse.success(
-                reviewService.findByCourse(slug, page, size, SecurityUtils.isAdmin(authentication))
+                reviewService.findByCourse(slug, page, size, SecurityUtils.isAdmin(authentication), sort)
         ));
+    }
+
+    @PutMapping("/api/v1/instructor/courses/{slug}/reviews/{reviewId}/reply")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR')")
+    @Operation(summary = "Reply to a review", description = "Admins and the course's instructor. One public reply per review; the reviewer is notified.")
+    public ResponseEntity<ApiResponse<ReviewResponse>> reply(
+            @PathVariable String slug, @PathVariable Integer reviewId, @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal AuthUserPrincipal user) {
+        return ResponseEntity.ok(ApiResponse.success("Reply posted", reviewService.reply(Actor.of(user), slug, reviewId, body.get("body"))));
+    }
+
+    @DeleteMapping("/api/v1/instructor/courses/{slug}/reviews/{reviewId}/reply")
+    @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR')")
+    @Operation(summary = "Remove a reply", description = "Admins and the course's instructor.")
+    public ResponseEntity<ApiResponse<Void>> deleteReply(
+            @PathVariable String slug, @PathVariable Integer reviewId, @AuthenticationPrincipal AuthUserPrincipal user) {
+        reviewService.deleteReply(Actor.of(user), slug, reviewId);
+        return ResponseEntity.ok(ApiResponse.success("Reply removed", null));
+    }
+
+    @PutMapping("/api/v1/me/reviews/{reviewId}/helpful")
+    @Operation(summary = "Mark a review helpful", description = "Idempotent. Not for your own review.")
+    public ResponseEntity<ApiResponse<ReviewResponse>> helpful(@PathVariable Integer reviewId, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(reviewService.setHelpful(authentication.getName(), reviewId, true)));
+    }
+
+    @DeleteMapping("/api/v1/me/reviews/{reviewId}/helpful")
+    @Operation(summary = "Take back a helpful vote", description = "Idempotent.")
+    public ResponseEntity<ApiResponse<ReviewResponse>> notHelpful(@PathVariable Integer reviewId, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(reviewService.setHelpful(authentication.getName(), reviewId, false)));
     }
 
     @DeleteMapping("/api/v1/courses/{slug}/reviews/{reviewId}")
