@@ -137,6 +137,10 @@ app:
     # Frontend origin that notification links open in
     app-url: ${TELEGRAM_APP_URL:http://localhost:3000}
 
+  organizations:
+    # Frontend page that accepts an organization invitation; the token is appended as ?token=
+    invite-url: ${ORGANIZATION_INVITE_URL:http://localhost:3000/organizations/join}
+
   demo-data:
     # Opt-in demo data: the bundled mock catalog, then the full-lifecycle seed (demo/lifecycle-seed.sql) with
     # accounts for every role. Never overwrites existing rows and only runs once.
