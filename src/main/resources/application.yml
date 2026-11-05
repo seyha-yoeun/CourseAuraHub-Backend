@@ -162,6 +162,8 @@ app:
     # Streams close after this long; clients reconnect, which re-checks their session
     stream-timeout: ${NOTIFICATION_STREAM_TIMEOUT:15m}
     heartbeat-interval: ${NOTIFICATION_HEARTBEAT_INTERVAL:PT25S}
+    # Push live notifications to streams on every instance over Postgres LISTEN/NOTIFY (holds one DB connection)
+    cluster-fanout: ${NOTIFICATION_CLUSTER_FANOUT:true}
     max-streams-per-user: ${NOTIFICATION_MAX_STREAMS_PER_USER:5}
 
   rate-limit:

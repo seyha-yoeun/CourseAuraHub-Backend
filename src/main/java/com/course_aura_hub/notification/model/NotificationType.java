@@ -15,6 +15,7 @@ public enum NotificationType {
     ASSIGNMENT,
     COURSE_REVIEW,
     COURSE_REMINDER,
+    ANNOUNCEMENT,
     WEEKLY_REPORT;
 
     public String apiValue() {

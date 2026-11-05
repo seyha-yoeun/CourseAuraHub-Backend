@@ -19,7 +19,21 @@ public record QuizAdminRequest(
 
         @NotEmpty(message = "Add at least one question")
         @Valid
-        List<Question> questions
+        List<Question> questions,
+        // The rules below are optional; leaving one out turns it off
+        @Min(value = 1, message = "Max attempts must be at least 1")
+        @Max(value = 100, message = "Max attempts must not exceed 100")
+        Integer maxAttempts,
+        @Min(value = 1, message = "Retry cooldown must be at least 1 minute")
+        @Max(value = 10080, message = "Retry cooldown must not exceed 7 days")
+        Integer retryCooldownMinutes,
+        @Min(value = 1, message = "Time limit must be at least 1 minute")
+        @Max(value = 600, message = "Time limit must not exceed 600 minutes")
+        Integer timeLimitMinutes,
+        @Min(value = 1, message = "Draw at least 1 question per attempt")
+        @Max(value = 200, message = "Draw at most 200 questions per attempt")
+        Integer questionsPerAttempt,
+        Boolean shuffle
 ) {
 
     public record Question(

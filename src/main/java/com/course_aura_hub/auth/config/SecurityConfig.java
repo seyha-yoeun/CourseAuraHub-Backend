@@ -105,17 +105,22 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/me", "/api/v1/me/**").authenticated()
                         // Public certificate verification (numbers are unguessable; no contact details exposed)
                         .requestMatchers(HttpMethod.GET, "/api/v1/certificates/*").permitAll()
+                        // Published learning paths are part of the public catalog
+                        .requestMatchers(HttpMethod.GET, "/api/v1/learning-paths", "/api/v1/learning-paths/*").permitAll()
                         // Payment provider webhooks, authenticated by signature in the gateway
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhooks/*").permitAll()
                         // Telegram webhook, authenticated by its secret header in the controller
                         .requestMatchers(HttpMethod.POST, "/api/v1/telegram/webhook").permitAll()
                         // Instructor workspace; each course is checked against its owner in the service
                         .requestMatchers("/api/v1/instructor/**").hasAnyRole("ADMIN", "INSTRUCTOR")
-                        .requestMatchers("/api/v1/admin/lessons/*/quiz").hasAnyRole("ADMIN", "INSTRUCTOR")
+                        .requestMatchers("/api/v1/admin/lessons/*/quiz", "/api/v1/admin/lessons/*/quiz/**")
+                        .hasAnyRole("ADMIN", "INSTRUCTOR")
                         // Account administration
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // The category list the catalog and course forms read
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories").permitAll()
+                        // Public instructor pages
+                        .requestMatchers(HttpMethod.GET, "/api/v1/instructors", "/api/v1/instructors/*").permitAll()
                         // Client-safe platform branding
                         .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").permitAll()
                         // Admin-only management resources
