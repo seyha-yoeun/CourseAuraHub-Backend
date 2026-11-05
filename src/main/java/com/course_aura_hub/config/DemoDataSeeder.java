@@ -59,6 +59,7 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final EnrollmentRepository enrollmentRepository;
     private final PlatformSettingsRepository platformSettingsRepository;
     private final UserRepository userRepository;
+    private final DemoLifecycleSeeder lifecycleSeeder;
 
     private final Map<Integer, Course> courseByOriginalId = new LinkedHashMap<>();
     private final Map<Integer, Student> studentByOriginalId = new LinkedHashMap<>();
@@ -71,6 +72,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         seedStudents(root.path("students"));
         seedEnrollments(root.path("enrollments"));
         seedSettings(root.path("settings"));
+        lifecycleSeeder.seed();
 
         log.info(
                 "Demo data seed complete courses={} students={} enrollments={} users={}",
