@@ -22,6 +22,8 @@ public interface CourseCertificateRepository extends JpaRepository<CourseCertifi
 
     boolean existsByStudentIdAndCourseId(Integer studentId, Integer courseId);
 
+    Optional<CourseCertificate> findByStudentIdAndCourseId(Integer studentId, Integer courseId);
+
     long countByStudentId(Integer studentId);
 
     /**
