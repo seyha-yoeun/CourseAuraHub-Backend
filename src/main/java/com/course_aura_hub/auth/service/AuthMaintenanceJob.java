@@ -2,12 +2,14 @@ package com.course_aura_hub.auth.service;
 
 import com.course_aura_hub.auth.config.AuthSecurityProperties;
 import com.course_aura_hub.auth.repository.OneTimeTokenRepository;
+import com.course_aura_hub.common.scheduling.ClusterJobLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 
 /**
@@ -21,12 +23,16 @@ public class AuthMaintenanceJob {
     private final OneTimeTokenRepository oneTimeTokenRepository;
     private final RefreshSessionService refreshSessionService;
     private final AuthSecurityProperties properties;
+    private final ClusterJobLock jobLock;
 
     @Scheduled(cron = "${app.security.auth.cleanup-cron:0 17 3 * * *}")
     @Transactional
     public void purgeExpiredCredentials() {
-        int tokens = oneTimeTokenRepository.deleteExpiredBefore(Instant.now().minus(properties.tokenRetention()));
-        int sessions = refreshSessionService.purgeExpired();
-        log.info("Auth maintenance removed {} expired one-time tokens and {} expired refresh tokens", tokens, sessions);
+        // The lease commits in its own transaction, so other instances see it while this one deletes
+        jobLock.runExclusively("auth-maintenance", Duration.ofMinutes(10), Duration.ofMinutes(1), () -> {
+            int tokens = oneTimeTokenRepository.deleteExpiredBefore(Instant.now().minus(properties.tokenRetention()));
+            int sessions = refreshSessionService.purgeExpired();
+            log.info("Auth maintenance removed {} expired one-time tokens and {} expired refresh tokens", tokens, sessions);
+        });
     }
 }
