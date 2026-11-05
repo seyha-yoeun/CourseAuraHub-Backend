@@ -48,6 +48,7 @@ public class TelegramMessages {
             case "new_enrollment" -> "🧑‍🎓";
             case "course_completed" -> "🎉";
             case "weekly_report" -> "📊";
+            case "announcement" -> "📣";
             default -> "🔔";
         };
     }
@@ -58,6 +59,7 @@ public class TelegramMessages {
             case "new_lesson" -> "Open course";
             case "certificate_issued" -> "View certificate";
             case "new_enrollment" -> "Open course";
+            case "announcement" -> "Open course";
             default -> "Open in CourseAuraHub";
         };
     }
