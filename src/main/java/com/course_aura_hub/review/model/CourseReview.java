@@ -55,6 +55,28 @@ public class CourseReview {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Hidden by moderation: left out of public lists and of the course rating. */
+    @Builder.Default
+    @Column(name = "hidden", nullable = false)
+    private boolean hidden = false;
+
+    @Builder.Default
+    @Column(name = "helpful_count", nullable = false)
+    private Integer helpfulCount = 0;
+
+    /** The course staff's one public reply. */
+    @Column(name = "reply", columnDefinition = "text")
+    private String reply;
+
+    @Column(name = "reply_author_id")
+    private java.util.UUID replyAuthorId;
+
+    @Column(name = "reply_author_name", columnDefinition = "text")
+    private String replyAuthorName;
+
+    @Column(name = "replied_at")
+    private Instant repliedAt;
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();

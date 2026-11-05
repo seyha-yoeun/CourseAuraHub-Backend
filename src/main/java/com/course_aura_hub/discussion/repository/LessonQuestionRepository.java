@@ -14,16 +14,16 @@ import java.util.UUID;
 
 public interface LessonQuestionRepository extends JpaRepository<LessonQuestion, Integer> {
 
-    List<LessonQuestion> findByLessonIdOrderByCreatedAtDescIdDesc(Integer lessonId);
+    List<LessonQuestion> findByLessonIdAndHiddenFalseOrderByCreatedAtDescIdDesc(Integer lessonId);
 
     @EntityGraph(attributePaths = {"lesson", "lesson.section", "lesson.section.course"})
     @Query("select q from LessonQuestion q where q.id = :id")
     Optional<LessonQuestion> findDetailedById(@Param("id") Integer id);
 
     @EntityGraph(attributePaths = {"lesson", "lesson.section", "lesson.section.course"})
-    Page<LessonQuestion> findByResolvedFalse(Pageable pageable);
+    Page<LessonQuestion> findByResolvedFalseAndHiddenFalse(Pageable pageable);
 
     @EntityGraph(attributePaths = {"lesson", "lesson.section", "lesson.section.course"})
-    @Query("select q from LessonQuestion q where q.resolved = false and q.lesson.section.course.ownerId = :ownerId")
+    @Query("select q from LessonQuestion q where q.resolved = false and q.hidden = false and q.lesson.section.course.ownerId = :ownerId")
     Page<LessonQuestion> findOpenByCourseOwner(@Param("ownerId") UUID ownerId, Pageable pageable);
 }

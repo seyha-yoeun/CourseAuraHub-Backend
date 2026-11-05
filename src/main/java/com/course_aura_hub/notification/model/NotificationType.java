@@ -6,6 +6,7 @@ public enum NotificationType {
     ENROLLED,
     PAYMENT_FAILED,
     ORDER_REFUNDED,
+    REFUND_REQUEST,
     CERTIFICATE_ISSUED,
     NEW_LESSON,
     COURSE_UPDATED,
