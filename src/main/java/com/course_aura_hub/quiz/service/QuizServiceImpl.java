@@ -7,6 +7,7 @@ import com.course_aura_hub.curriculum.dto.LessonProgressResponse;
 import com.course_aura_hub.curriculum.model.Lesson;
 import com.course_aura_hub.curriculum.model.LessonType;
 import com.course_aura_hub.curriculum.repository.LessonRepository;
+import com.course_aura_hub.curriculum.service.LessonAvailability;
 import com.course_aura_hub.curriculum.service.LessonProgressService;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.quiz.dto.QuizAdminRequest;
@@ -42,12 +43,14 @@ public class QuizServiceImpl implements QuizService {
     private final LessonProgressService lessonProgressService;
     private final StudentCourseRepository studentCourseRepository;
     private final LearnerAccountService learnerAccountService;
+    private final LessonAvailability lessonAvailability;
 
     @Override
     @Transactional(readOnly = true)
     public QuizResponse findForLearner(String email, Integer lessonId) {
         Lesson lesson = findQuizLesson(lessonId);
         Student student = requireEnrollment(email, lesson);
+        lessonAvailability.requireAvailable(lesson, student.getId());
 
         List<QuizResponse.Question> questions = questionRepository.findByLessonIdOrderByPositionAsc(lessonId).stream()
                 .map(question -> new QuizResponse.Question(
@@ -74,6 +77,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizResultResponse submit(String email, Integer lessonId, Map<Integer, Integer> answers) {
         Lesson lesson = findQuizLesson(lessonId);
         Student student = requireEnrollment(email, lesson);
+        lessonAvailability.requireAvailable(lesson, student.getId());
 
         List<QuizQuestion> questions = questionRepository.findByLessonIdOrderByPositionAsc(lessonId);
         if (questions.isEmpty()) {

@@ -21,6 +21,7 @@ import com.course_aura_hub.course.service.CourseAccess;
 import com.course_aura_hub.curriculum.model.Lesson;
 import com.course_aura_hub.curriculum.model.LessonType;
 import com.course_aura_hub.curriculum.repository.LessonRepository;
+import com.course_aura_hub.curriculum.service.LessonAvailability;
 import com.course_aura_hub.curriculum.service.LessonProgressService;
 import com.course_aura_hub.file.model.FilePurpose;
 import com.course_aura_hub.file.service.FileService;
@@ -54,6 +55,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final LessonProgressService lessonProgressService;
     private final StudentCourseRepository studentCourseRepository;
     private final LearnerAccountService learnerAccountService;
+    private final LessonAvailability lessonAvailability;
     private final CourseAccess courseAccess;
     private final FileService fileService;
     private final NotificationService notificationService;
@@ -66,6 +68,10 @@ public class AssignmentServiceImpl implements AssignmentService {
         boolean staff = courseAccess.canManage(course, actor);
         if (!staff && !studentCourseRepository.isUserEnrolled(actor.email(), course.getId())) {
             throw new ForbiddenActionException("Enroll in this course to see its assignments");
+        }
+        if (!staff) {
+            learnerAccountService.findCurrentStudent(actor.email())
+                    .ifPresent(student -> lessonAvailability.requireAvailable(lesson, student.getId()));
         }
         return assignmentRepository.findByLessonId(lessonId)
                 .map(assignment -> toResponse(assignment, learnerAccountService.findCurrentStudent(actor.email())
@@ -85,6 +91,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         if (!studentCourseRepository.existsByStudentIdAndCourseId(student.getId(), course.getId())) {
             throw new ForbiddenActionException("Enroll in this course to submit work");
         }
+        lessonAvailability.requireAvailable(lesson, student.getId());
 
         String fileUrl = StringUtils.hasText(request.fileUrl()) ? request.fileUrl().trim() : null;
         String comment = StringUtils.hasText(request.comment()) ? request.comment().trim() : null;

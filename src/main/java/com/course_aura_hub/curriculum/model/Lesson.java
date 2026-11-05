@@ -58,4 +58,8 @@ public class Lesson {
     @Builder.Default
     @Column(name = "quiz_pass_percent", nullable = false)
     private Integer quizPassPercent = 70;
+
+    /** Days after enrolling before the lesson opens; null opens it straight away. */
+    @Column(name = "release_after_days")
+    private Integer releaseAfterDays;
 }
