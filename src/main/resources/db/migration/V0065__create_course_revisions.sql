@@ -1,4 +1,4 @@
--- V0060: Edits to a live instructor course wait as a revision until an admin approves them, so a published course
+-- V0065: Edits to a live instructor course wait as a revision until an admin approves them, so a published course
 -- can't change price or promise without review. Approved revisions double as the course's public changelog.
 
 CREATE TABLE IF NOT EXISTS course_revisions (
