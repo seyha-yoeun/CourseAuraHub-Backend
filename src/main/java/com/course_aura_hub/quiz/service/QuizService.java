@@ -2,10 +2,13 @@ package com.course_aura_hub.quiz.service;
 
 import com.course_aura_hub.quiz.dto.QuizAdminRequest;
 import com.course_aura_hub.quiz.dto.QuizAdminResponse;
+import com.course_aura_hub.quiz.dto.QuizAttemptGrantRequest;
+import com.course_aura_hub.quiz.dto.QuizAttemptGrantResponse;
 import com.course_aura_hub.quiz.dto.QuizResponse;
 import com.course_aura_hub.quiz.dto.QuizResultResponse;
 
 import java.util.Map;
+import java.util.UUID;
 
 public interface QuizService {
 
@@ -19,4 +22,13 @@ public interface QuizService {
 
     /** Replaces the questions. Past attempts and passes are kept. */
     QuizAdminResponse save(Integer lessonId, QuizAdminRequest request);
+
+    /**
+     * Starts an attempt of a timed, pooled or shuffled quiz, or returns the one in progress. Other quizzes need
+     * no start and just return the quiz.
+     */
+    QuizResponse start(String email, Integer lessonId);
+
+    /** Adds attempts for one enrolled learner beyond the quiz's limit. */
+    QuizAttemptGrantResponse grantAttempts(Integer lessonId, QuizAttemptGrantRequest request, UUID grantedBy);
 }

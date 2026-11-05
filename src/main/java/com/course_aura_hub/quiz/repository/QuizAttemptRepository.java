@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Integer> {
 
@@ -15,4 +17,6 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Intege
 
     @Query("select max(a.scorePercent) from QuizAttempt a where a.studentId = :studentId and a.lessonId = :lessonId")
     Integer findBestScore(@Param("studentId") Integer studentId, @Param("lessonId") Integer lessonId);
+
+    Optional<QuizAttempt> findFirstByStudentIdAndLessonIdOrderBySubmittedAtDescIdDesc(Integer studentId, Integer lessonId);
 }
