@@ -11,6 +11,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.graphics.state.RenderingMode;
 import org.springframework.stereotype.Component;
 
 import java.awt.Color;
@@ -33,8 +34,9 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class ReceiptPdfRenderer {
 
+    // PDFBox bundles only the regular face, so bold text is the same font filled and stroked
     private static final String REGULAR_FONT = "/org/apache/pdfbox/resources/ttf/LiberationSans-Regular.ttf";
-    private static final String BOLD_FONT = "/org/apache/pdfbox/resources/ttf/LiberationSans-Bold.ttf";
+    private static final float FAUX_BOLD_STROKE = 0.03f;
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm 'UTC'", Locale.ENGLISH)
             .withZone(ZoneOffset.UTC);
 
@@ -53,7 +55,7 @@ public class ReceiptPdfRenderer {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(PDRectangle.A4);
             document.addPage(page);
-            Fonts fonts = new Fonts(load(document, REGULAR_FONT), load(document, BOLD_FONT));
+            Fonts fonts = new Fonts(load(document, REGULAR_FONT));
             float width = page.getMediaBox().getWidth();
             float top = page.getMediaBox().getHeight() - MARGIN;
 
@@ -142,7 +144,7 @@ public class ReceiptPdfRenderer {
         }
     }
 
-    private record Fonts(PDFont regular, PDFont bold) {
+    private record Fonts(PDFont regular) {
     }
 
     private final class Pen {
@@ -173,10 +175,17 @@ public class ReceiptPdfRenderer {
         }
 
         void text(String text, float x, float y, float size, boolean bold, Color color) throws IOException {
-            PDFont font = bold ? fonts.bold() : fonts.regular();
+            PDFont font = fonts.regular();
             if (canDraw(font, text)) {
                 content.beginText();
                 content.setNonStrokingColor(color);
+                if (bold) {
+                    content.setStrokingColor(color);
+                    content.setLineWidth(size * FAUX_BOLD_STROKE);
+                    content.setRenderingMode(RenderingMode.FILL_STROKE);
+                } else {
+                    content.setRenderingMode(RenderingMode.FILL);
+                }
                 content.setFont(font, size);
                 content.newLineAtOffset(x, y);
                 content.showText(text);
@@ -187,7 +196,7 @@ public class ReceiptPdfRenderer {
         }
 
         float width(String text, float size, boolean bold) throws IOException {
-            PDFont font = bold ? fonts.bold() : fonts.regular();
+            PDFont font = fonts.regular();
             return canDraw(font, text) ? font.getStringWidth(text) / 1000 * size : outlineOf(text, size, bold).width();
         }
 
