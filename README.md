@@ -60,6 +60,21 @@ docker compose up -d
 
 Flyway creates the schema and seeds sample data on first start: about a year of mock courses, students and enrollments, plus a free starter course (**Git & GitHub Fundamentals**) with a full curriculum.
 
+**Demo data for the whole app:** set `DEMO_DATA_ENABLED=true` (and optionally `DEMO_PASSWORD`, default `Demo@2026!`) and restart. It seeds once, on top of the sample catalog, with accounts that all sign in with that password:
+
+| Account | Role | What you'll see |
+|---|---|---|
+| `admin@demo.courseaurahub.io` | Admin | A course waiting for review, a pending card application and top-up, refunds, the audit log |
+| `sokha.chan@demo.courseaurahub.io` | Instructor | A published course (sequential lessons, drip, timed quiz, assignment) with analytics, one in review, one sent back, a submission to grade, an open question |
+| `lina.meas@demo.courseaurahub.io` | Instructor | A course on sale and an empty draft |
+| `vannak.kim@demo.courseaurahub.io` | Learner | Three courses in progress, notes, Q&A, a cart, a member card with history and a pending top-up |
+| `sreymom.chea@demo.courseaurahub.io` | Learner | Finished courses, certificates, a completed learning path, reviews |
+| `rithy.pov@demo.courseaurahub.io` | Learner | Out of quiz attempts (with one granted back), a reminder, failed and cancelled payments, a pending card application |
+| `nita.ouk@demo.courseaurahub.io` | Learner | A refund, a cart checkout awaiting payment, a rejected card application |
+| `bopha.lim@demo.courseaurahub.io` | Learner | A brand-new account with a wishlist |
+
+`pending.signup@…` never verified its email and `disabled.account@…` is disabled, so neither can sign in. Never enable demo data in production.
+
 **Creating an admin account:** set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` in `.env` before starting the app. To promote accounts that already exist, list their emails in `BOOTSTRAP_ADMIN_PROMOTE_EMAILS`.
 
 **Useful URLs**
