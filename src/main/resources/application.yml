@@ -137,6 +137,10 @@ app:
     # Frontend origin that notification links open in
     app-url: ${TELEGRAM_APP_URL:http://localhost:3000}
 
+  organizations:
+    # Frontend page that accepts an organization invitation; the token is appended as ?token=
+    invite-url: ${ORGANIZATION_INVITE_URL:http://localhost:3000/organizations/join}
+
   refunds:
     # Learners ask for refunds in the app. Inside the window and below the progress limit they're refunded at once.
     enabled: ${REFUNDS_ENABLED:true}
