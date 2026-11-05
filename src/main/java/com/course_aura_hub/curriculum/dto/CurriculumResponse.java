@@ -11,6 +11,8 @@ public record CurriculumResponse(
         CourseProgress progress,
         // First lesson the enrolled viewer has not completed; null when not enrolled or the course is completed
         Integer nextLessonId,
-        List<SectionResponse> sections
+        List<SectionResponse> sections,
+        // Lessons unlock in order, once the ones before them are complete
+        boolean sequentialLessons
 ) {
 }

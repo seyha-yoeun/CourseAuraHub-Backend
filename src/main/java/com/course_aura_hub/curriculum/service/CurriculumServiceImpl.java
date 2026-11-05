@@ -8,6 +8,8 @@ import com.course_aura_hub.course.model.CourseStatus;
 import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.curriculum.dto.CourseProgress;
 import com.course_aura_hub.curriculum.dto.CurriculumResponse;
+import com.course_aura_hub.curriculum.dto.CurriculumSettingsRequest;
+import com.course_aura_hub.curriculum.dto.CurriculumSettingsResponse;
 import com.course_aura_hub.curriculum.dto.LessonCreateRequest;
 import com.course_aura_hub.curriculum.dto.LessonResponse;
 import com.course_aura_hub.curriculum.dto.LessonUpdateRequest;
@@ -62,6 +64,7 @@ public class CurriculumServiceImpl implements CurriculumService {
     private final CertificateService certificateService;
     private final NotificationService notificationService;
     private final FileService fileService;
+    private final LessonAvailability lessonAvailability;
 
     @Override
     @Transactional(readOnly = true)
@@ -88,8 +91,13 @@ public class CurriculumServiceImpl implements CurriculumService {
                 .map(sc -> findPositions(sc.getStudent().getId(), courseSections))
                 .orElse(Map.of());
 
+        // Staff see everything; pacing only applies to enrolled learners
+        Map<Integer, LessonLock> locks = admin ? Map.of() : enrollment
+                .map(sc -> lessonAvailability.locksFor(course, sc.getStudent().getId(), courseSections, completedIds))
+                .orElse(Map.of());
+
         List<SectionResponse> sections = courseSections.stream()
-                .map(section -> curriculumAssembler.toResponse(section, admin || enrolled, completedIds, positions))
+                .map(section -> curriculumAssembler.toResponse(section, admin || enrolled, completedIds, positions, locks))
                 .toList();
 
         int totalLessons = sections.stream().mapToInt(section -> section.lessons().size()).sum();
@@ -112,7 +120,8 @@ public class CurriculumServiceImpl implements CurriculumService {
                 totalMinutes,
                 progress,
                 nextLessonId,
-                sections
+                sections,
+                course.isSequentialLessons()
         );
     }
 
@@ -181,6 +190,7 @@ public class CurriculumServiceImpl implements CurriculumService {
                 .contentUrl(fileService.toStoredUrl(trimToNull(request.contentUrl())))
                 .preview(Boolean.TRUE.equals(request.preview()))
                 .position(position)
+                .releaseAfterDays(releaseDays(request.releaseAfterDays()))
                 .build();
         section.getLessons().add(lesson);
         Lesson saved = lessonRepository.save(lesson);
@@ -219,6 +229,9 @@ public class CurriculumServiceImpl implements CurriculumService {
         }
         if (request.position() != null) {
             lesson.setPosition(request.position());
+        }
+        if (request.releaseAfterDays() != null) {
+            lesson.setReleaseAfterDays(releaseDays(request.releaseAfterDays()));
         }
 
         LessonResponse response = curriculumAssembler.toResponse(lesson);
@@ -272,6 +285,23 @@ public class CurriculumServiceImpl implements CurriculumService {
                 lesson.getTitle() + " was added to " + course.getTitle() + ".",
                 "/learn/" + course.getSlug()
         );
+    }
+
+    @Override
+    @Transactional
+    public CurriculumSettingsResponse updateSettings(String courseSlug, CurriculumSettingsRequest request) {
+        Course course = findCourse(courseSlug);
+        if (request.sequentialLessons() != null) {
+            course.setSequentialLessons(request.sequentialLessons());
+            course.setUpdatedAt(LocalDate.now());
+        }
+        log.info("Updated curriculum settings courseId={} sequentialLessons={}", course.getId(), course.isSequentialLessons());
+        return new CurriculumSettingsResponse(course.isSequentialLessons());
+    }
+
+    /** No delay is stored as null, so the column only holds real drip schedules. */
+    private static Integer releaseDays(Integer days) {
+        return days == null || days == 0 ? null : days;
     }
 
     private Course findCourse(String slug) {

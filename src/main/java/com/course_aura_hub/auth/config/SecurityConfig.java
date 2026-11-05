@@ -132,7 +132,8 @@ public class SecurityConfig {
                         // Curriculum writes: @PreAuthorize limits instructors to their own courses
                         .requestMatchers(HttpMethod.POST, "/api/v1/courses/*/sections/**", "/api/v1/courses/*/lessons/**")
                         .hasAnyRole("ADMIN", "INSTRUCTOR")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/courses/*/sections/**", "/api/v1/courses/*/lessons/**")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/courses/*/sections/**", "/api/v1/courses/*/lessons/**",
+                                "/api/v1/courses/*/curriculum/settings")
                         .hasAnyRole("ADMIN", "INSTRUCTOR")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/courses/*/sections/**", "/api/v1/courses/*/lessons/**")
                         .hasAnyRole("ADMIN", "INSTRUCTOR")
