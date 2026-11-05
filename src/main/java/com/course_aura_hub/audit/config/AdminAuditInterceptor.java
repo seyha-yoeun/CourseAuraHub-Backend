@@ -38,6 +38,7 @@ public class AdminAuditInterceptor implements HandlerInterceptor {
     private static final String API_PREFIX = "/api/v1/";
     private static final Set<String> SCOPES = Set.of("admin", "instructor");
     private static final int MAX_VALUE_LENGTH = 200;
+    static final String EXPORT_SEGMENT = "/exports/";
 
     private final AdminAuditService auditService;
     private final ClientInfoResolver clientInfoResolver;
@@ -49,7 +50,9 @@ public class AdminAuditInterceptor implements HandlerInterceptor {
             @NonNull Object handler,
             Exception ex
     ) {
-        if (!WRITE_METHODS.contains(request.getMethod()) || !(handler instanceof HandlerMethod method)) {
+        // Writes, plus data exports: a download of personal data is worth a trail too
+        boolean export = request.getRequestURI().contains(EXPORT_SEGMENT);
+        if ((!WRITE_METHODS.contains(request.getMethod()) && !export) || !(handler instanceof HandlerMethod method)) {
             return;
         }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
