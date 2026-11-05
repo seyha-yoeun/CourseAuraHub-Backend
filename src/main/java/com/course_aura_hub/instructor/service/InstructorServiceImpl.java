@@ -19,6 +19,7 @@ import com.course_aura_hub.instructor.dto.InstructorStudentResponse;
 import com.course_aura_hub.instructor.dto.InstructorSummaryResponse;
 import com.course_aura_hub.notification.model.NotificationType;
 import com.course_aura_hub.notification.service.NotificationService;
+import com.course_aura_hub.revision.service.CourseRevisionService;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +42,7 @@ public class InstructorServiceImpl implements InstructorService {
     private final CourseService courseService;
     private final CourseAssembler courseAssembler;
     private final CourseAccess courseAccess;
+    private final CourseRevisionService revisionService;
     private final LessonRepository lessonRepository;
     private final StudentCourseRepository studentCourseRepository;
     private final UserRepository userRepository;
@@ -107,6 +109,11 @@ public class InstructorServiceImpl implements InstructorService {
         Course course = requireManaged(actor, slug);
         if (course.getStatus() == CourseStatus.PENDING_REVIEW) {
             throw new BusinessRuleException("This course is being reviewed, so it can't be changed right now");
+        }
+        // A live instructor course changes only through an approved revision; admins edit directly
+        if (course.getStatus() == CourseStatus.PUBLISHED && course.getOwnerId() != null && !actor.admin()) {
+            revisionService.propose(actor, course, request);
+            return toResponse(course);
         }
         courseService.update(slug, new CourseUpdateRequest(
                 request.title(),
@@ -231,6 +238,7 @@ public class InstructorServiceImpl implements InstructorService {
     }
 
     private InstructorCourseResponse toResponse(Course course) {
-        return new InstructorCourseResponse(courseAssembler.toResponse(course, null), course.getReviewNote());
+        return new InstructorCourseResponse(courseAssembler.toResponse(course, null), course.getReviewNote(),
+                revisionService.findPending(course.getId()));
     }
 }
