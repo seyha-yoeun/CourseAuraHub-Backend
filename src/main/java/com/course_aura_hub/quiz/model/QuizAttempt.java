@@ -51,6 +51,10 @@ public class QuizAttempt {
     @Column(name = "submitted_at", nullable = false, updatable = false)
     private Instant submittedAt;
 
+    /** When a session-based attempt began; null for quizzes taken without a session. */
+    @Column(name = "started_at", updatable = false)
+    private Instant startedAt;
+
     @PrePersist
     void onCreate() {
         if (submittedAt == null) {
