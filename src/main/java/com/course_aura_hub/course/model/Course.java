@@ -94,6 +94,10 @@ public class Course {
     @Column(name = "completion_rate", nullable = false, precision = 5, scale = 2)
     private BigDecimal completionRate;
 
+    /** Each lesson unlocks once every lesson before it is complete. */
+    @Column(name = "sequential_lessons", nullable = false)
+    private boolean sequentialLessons;
+
     // The instructor who manages this course; null for admin-managed courses
     @Column(name = "owner_id")
     private java.util.UUID ownerId;

@@ -21,6 +21,10 @@ public record LessonUpdateRequest(
         Boolean preview,
 
         @Min(value = 0, message = "Position cannot be negative")
-        Integer position
+        Integer position,
+        // 0 opens the lesson straight away
+        @Min(value = 0, message = "Release delay cannot be negative")
+        @Max(value = 3650, message = "Release delay must not exceed 3650 days")
+        Integer releaseAfterDays
 ) {
 }

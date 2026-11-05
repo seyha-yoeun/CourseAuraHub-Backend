@@ -57,6 +57,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
     private final QuizAttemptRepository quizAttemptRepository;
     private final AssignmentRepository assignmentRepository;
     private final AssignmentSubmissionRepository submissionRepository;
+    private final LessonAvailability lessonAvailability;
 
     @Override
     @Transactional
@@ -67,6 +68,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
         Student student = studentCourse.getStudent();
 
         if (lessonProgressRepository.findByStudentIdAndLessonId(student.getId(), lessonId).isEmpty()) {
+            lessonAvailability.requireAvailable(lesson, student.getId());
             requirePassedQuiz(lesson, student);
             requirePassedAssignment(lesson, student);
             lessonProgressRepository.save(LessonProgress.builder()
@@ -148,6 +150,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
             throw new BusinessRuleException("Only video lessons have a playback position");
         }
         Student student = requireEnrollment(email, lesson.getSection().getCourse()).getStudent();
+        lessonAvailability.requireAvailable(lesson, student.getId());
         lessonWatchPositionRepository.upsert(student.getId(), lessonId, positionSeconds);
         return new LessonPositionResponse(lessonId, positionSeconds);
     }

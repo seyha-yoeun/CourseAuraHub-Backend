@@ -4,6 +4,8 @@ import com.course_aura_hub.common.dto.ApiResponse;
 import com.course_aura_hub.common.security.SecurityUtils;
 import com.course_aura_hub.course.service.CourseAccess;
 import com.course_aura_hub.curriculum.dto.CurriculumResponse;
+import com.course_aura_hub.curriculum.dto.CurriculumSettingsRequest;
+import com.course_aura_hub.curriculum.dto.CurriculumSettingsResponse;
 import com.course_aura_hub.curriculum.dto.LessonCreateRequest;
 import com.course_aura_hub.curriculum.dto.LessonResponse;
 import com.course_aura_hub.curriculum.dto.LessonUpdateRequest;
@@ -54,6 +56,21 @@ public class CurriculumController {
                 SecurityUtils.emailOf(authentication),
                 courseAccess.canManage(authentication, slug)
         )));
+    }
+
+    @PutMapping("/curriculum/settings")
+    @PreAuthorize("@courseAccess.canManage(authentication, #slug)")
+    @Operation(
+            summary = "Update curriculum settings",
+            description = "Admins and the course's instructor. With sequentialLessons, each lesson unlocks once the "
+                    + "earlier ones are complete. Per-lesson drip delays are set with releaseAfterDays on a lesson."
+    )
+    public ResponseEntity<ApiResponse<CurriculumSettingsResponse>> updateSettings(
+            @PathVariable String slug,
+            @RequestBody CurriculumSettingsRequest request
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Curriculum settings updated", curriculumService.updateSettings(slug, request)));
     }
 
     @PostMapping("/sections")

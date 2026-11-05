@@ -1,6 +1,8 @@
 package com.course_aura_hub.curriculum.service;
 
 import com.course_aura_hub.curriculum.dto.CurriculumResponse;
+import com.course_aura_hub.curriculum.dto.CurriculumSettingsRequest;
+import com.course_aura_hub.curriculum.dto.CurriculumSettingsResponse;
 import com.course_aura_hub.curriculum.dto.LessonCreateRequest;
 import com.course_aura_hub.curriculum.dto.LessonResponse;
 import com.course_aura_hub.curriculum.dto.LessonUpdateRequest;
@@ -23,4 +25,7 @@ public interface CurriculumService {
     LessonResponse updateLesson(String courseSlug, Integer lessonId, LessonUpdateRequest request);
 
     void deleteLesson(String courseSlug, Integer lessonId);
+
+    /** Course-wide pacing: whether lessons unlock in order. */
+    CurriculumSettingsResponse updateSettings(String courseSlug, CurriculumSettingsRequest request);
 }

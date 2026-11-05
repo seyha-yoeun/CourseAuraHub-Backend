@@ -7,6 +7,7 @@ import com.course_aura_hub.curriculum.dto.LessonProgressResponse;
 import com.course_aura_hub.curriculum.model.Lesson;
 import com.course_aura_hub.curriculum.model.LessonType;
 import com.course_aura_hub.curriculum.repository.LessonRepository;
+import com.course_aura_hub.curriculum.service.LessonAvailability;
 import com.course_aura_hub.curriculum.service.LessonProgressService;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.quiz.dto.QuizAdminRequest;
@@ -68,6 +69,7 @@ public class QuizServiceImpl implements QuizService {
     private final StudentCourseRepository studentCourseRepository;
     private final StudentRepository studentRepository;
     private final LearnerAccountService learnerAccountService;
+    private final LessonAvailability lessonAvailability;
 
     /** Attempts left and when the next one may start, for one learner on one quiz. */
     private record AttemptState(long used, Integer remaining, Instant nextAttemptAt) {
@@ -87,6 +89,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizResponse findForLearner(String email, Integer lessonId) {
         Lesson lesson = findQuizLesson(lessonId);
         Student student = requireEnrollment(email, lesson);
+        lessonAvailability.requireAvailable(lesson, student.getId());
 
         if (!lesson.quizNeedsSession()) {
             return toLearnerResponse(lesson, student, questionRepository.findByLessonIdOrderByPositionAsc(lessonId),
@@ -108,6 +111,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizResponse start(String email, Integer lessonId) {
         Lesson lesson = findQuizLesson(lessonId);
         Student student = lockStudent(requireEnrollment(email, lesson));
+        lessonAvailability.requireAvailable(lesson, student.getId());
         if (!lesson.quizNeedsSession()) {
             return findForLearner(email, lessonId);
         }
@@ -152,6 +156,7 @@ public class QuizServiceImpl implements QuizService {
     public QuizResultResponse submit(String email, Integer lessonId, Map<Integer, Integer> answers) {
         Lesson lesson = findQuizLesson(lessonId);
         Student student = lockStudent(requireEnrollment(email, lesson));
+        lessonAvailability.requireAvailable(lesson, student.getId());
 
         QuizSession session = null;
         List<QuizQuestion> questions;
