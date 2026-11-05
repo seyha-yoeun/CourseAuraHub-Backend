@@ -32,7 +32,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `learner` | Self-service: my courses, self-enroll, dashboard, achievements, profile, password, wishlist | `/api/v1/me` |
 | `certificate` | Completion certificates, PDF download, public verification | `/api/v1/me/certificates`, `/api/v1/me/certificates/{number}/pdf`, `/api/v1/certificates/{number}` (public) |
 | `curriculum` | Sections, lessons, lesson progress, video resume | `/api/v1/courses/{slug}/curriculum`, `/api/v1/me/lessons` |
-| `order` | Checkout, order history, refunds, `PaymentGateway` port | `/api/v1/me/orders`, `/api/v1/admin/orders`, `/api/v1/payments/webhooks/{provider}` |
+| `order` | Checkout, order history, refunds, PDF receipts, `PaymentGateway` port | `/api/v1/me/orders`, `/api/v1/me/orders/{number}/receipt`, `/api/v1/admin/orders`, `/api/v1/admin/orders/{number}/receipt`, `/api/v1/payments/webhooks/{provider}` |
 | `coupon` | Discount codes; redemptions are derived from orders | `/api/v1/me/coupons/preview`, `/api/v1/admin/coupons` |
 | `notification` | Saved notifications and the live SSE stream | `/api/v1/me/notifications`, `/api/v1/me/notifications/stream` |
 | `telegram` | Connects accounts to private chats, sends notifications there, bot commands | `/api/v1/me/telegram`, `/api/v1/telegram/webhook` |

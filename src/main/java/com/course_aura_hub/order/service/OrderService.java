@@ -54,6 +54,12 @@ public interface OrderService {
 
     OrderResponse cancelMine(String email, String orderNumber);
 
+    /** PDF receipt for the caller's own paid or refunded order. */
+    byte[] renderMyReceipt(String email, String orderNumber);
+
+    /** PDF receipt for any paid or refunded order. Admin-only. */
+    byte[] renderReceipt(String orderNumber);
+
     /** Applies a verified provider event. Safe to call repeatedly: providers redeliver webhooks. */
     void applyPaymentEvent(PaymentEvent event);
 
