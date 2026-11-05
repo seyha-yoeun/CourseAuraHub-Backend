@@ -1,5 +1,6 @@
 package com.course_aura_hub.telegram.service;
 
+import com.course_aura_hub.common.scheduling.ClusterJobLock;
 import com.course_aura_hub.telegram.client.TelegramClient;
 import com.course_aura_hub.telegram.client.TelegramException;
 import com.course_aura_hub.telegram.config.TelegramProperties;
@@ -12,9 +13,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+
 /**
- * Registers the webhook, or polls when there is no public URL. Telegram allows one receiver per bot,
- * so polling suits a single instance and production should set a webhook URL.
+ * Registers the webhook, or polls when there is no public URL. Telegram allows one receiver per bot, so only the
+ * instance holding the polling lease polls; it keeps the lease while it runs, and another instance takes over
+ * within {@link #POLL_LEASE} if it stops. Production should still set a webhook URL.
  */
 @Slf4j
 @Component
@@ -24,6 +28,9 @@ public class TelegramUpdateReceiver {
     private final TelegramClient client;
     private final TelegramBotService botService;
     private final TelegramProperties properties;
+    private final ClusterJobLock jobLock;
+
+    static final Duration POLL_LEASE = Duration.ofSeconds(30);
 
     private long nextOffset;
 
@@ -50,13 +57,15 @@ public class TelegramUpdateReceiver {
         if (!properties.usesPolling()) {
             return;
         }
-        try {
-            for (TelegramUpdate update : client.getUpdates(nextOffset)) {
-                nextOffset = update.updateId() + 1;
-                botService.handle(update);
+        jobLock.runExclusively("telegram-polling", Duration.ofMinutes(1), POLL_LEASE, () -> {
+            try {
+                for (TelegramUpdate update : client.getUpdates(nextOffset)) {
+                    nextOffset = update.updateId() + 1;
+                    botService.handle(update);
+                }
+            } catch (TelegramException ex) {
+                log.debug("Telegram poll failed: {}", ex.getMessage());
             }
-        } catch (TelegramException ex) {
-            log.debug("Telegram poll failed: {}", ex.getMessage());
-        }
+        });
     }
 }
