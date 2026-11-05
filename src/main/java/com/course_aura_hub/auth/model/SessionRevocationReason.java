@@ -11,5 +11,6 @@ public enum SessionRevocationReason {
     ACCOUNT_DISABLED,
     ADMIN_REVOKED,
     REUSE_DETECTED,
-    SESSION_LIMIT
+    SESSION_LIMIT,
+    ACCOUNT_DELETED
 }
