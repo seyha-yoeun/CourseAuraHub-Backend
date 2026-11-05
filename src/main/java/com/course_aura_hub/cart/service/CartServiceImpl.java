@@ -15,6 +15,7 @@ import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.course.model.CourseStatus;
 import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
+import com.course_aura_hub.prerequisite.service.PrerequisiteService;
 import com.course_aura_hub.order.config.PaymentProperties;
 import com.course_aura_hub.student.model.Student;
 import com.course_aura_hub.student.repository.StudentCourseRepository;
@@ -35,6 +36,7 @@ public class CartServiceImpl implements CartService {
     private final LearnerAccountService learnerAccountService;
     private final CouponService couponService;
     private final PaymentProperties paymentProperties;
+    private final PrerequisiteService prerequisiteService;
 
     @Override
     @Transactional(readOnly = true)
@@ -58,6 +60,7 @@ public class CartServiceImpl implements CartService {
         if (studentCourseRepository.existsByStudentIdAndCourseId(student.getId(), course.getId())) {
             throw new DuplicateResourceException("You are already enrolled in this course");
         }
+        prerequisiteService.requireMet(student.getId(), course.getId());
         if (!cartItemRepository.existsByStudentIdAndCourseId(student.getId(), course.getId())) {
             cartItemRepository.save(CartItem.builder().student(student).course(course).build());
         }

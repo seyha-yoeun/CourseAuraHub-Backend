@@ -9,6 +9,12 @@ public record ReviewResponse(
         String reviewerName,
         String reviewerAvatar,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        int helpfulCount,
+        // The course staff's public reply, or null
+        Reply reply
 ) {
+
+    public record Reply(String body, String authorName, Instant repliedAt) {
+    }
 }
