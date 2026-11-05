@@ -105,6 +105,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/me", "/api/v1/me/**").authenticated()
                         // Public certificate verification (numbers are unguessable; no contact details exposed)
                         .requestMatchers(HttpMethod.GET, "/api/v1/certificates/*").permitAll()
+                        // Published learning paths are part of the public catalog
+                        .requestMatchers(HttpMethod.GET, "/api/v1/learning-paths", "/api/v1/learning-paths/*").permitAll()
                         // Payment provider webhooks, authenticated by signature in the gateway
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhooks/*").permitAll()
                         // Telegram webhook, authenticated by its secret header in the controller
