@@ -1,4 +1,4 @@
--- V0061: Team accounts. An admin creates an organization and grants it seats per course; its managers invite people
+-- V0066: Team accounts. An admin creates an organization and grants it seats per course; its managers invite people
 -- and assign seats, which enrolls the member for free. Managers see their own members' progress only.
 
 CREATE TABLE IF NOT EXISTS organizations (
