@@ -22,6 +22,7 @@ import com.course_aura_hub.notification.service.NotificationService;
 import com.course_aura_hub.order.dto.AdminOrderPageResponse;
 import com.course_aura_hub.order.dto.AdminOrderResponse;
 import com.course_aura_hub.order.dto.OrderResponse;
+import com.course_aura_hub.prerequisite.service.PrerequisiteService;
 import com.course_aura_hub.order.model.Order;
 import com.course_aura_hub.order.model.OrderGroup;
 import com.course_aura_hub.order.model.OrderStatus;
@@ -76,6 +77,7 @@ public class OrderServiceImpl implements OrderService {
     private final ReceiptPdfRenderer receiptPdfRenderer;
     private final SettingsService settingsService;
     private final ApplicationEventPublisher eventPublisher;
+    private final PrerequisiteService prerequisiteService;
 
     @Override
     @Transactional
@@ -95,6 +97,7 @@ public class OrderServiceImpl implements OrderService {
         if (studentCourseRepository.existsByStudentIdAndCourseId(student.getId(), course.getId())) {
             throw new DuplicateResourceException("You are already enrolled in this course");
         }
+        prerequisiteService.requireMet(student.getId(), course.getId());
 
         Optional<Order> open = orderRepository
                 .findByStudentIdAndCourseIdAndStatusAndGiftFalse(student.getId(), course.getId(), OrderStatus.PENDING);

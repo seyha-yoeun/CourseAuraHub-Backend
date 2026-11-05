@@ -19,6 +19,7 @@ import com.course_aura_hub.learner.dto.DailyActivityResponse;
 import com.course_aura_hub.learner.dto.LearnerDashboardResponse;
 import com.course_aura_hub.learner.dto.MyCourseResponse;
 import com.course_aura_hub.learner.service.LearnerAccountService;
+import com.course_aura_hub.prerequisite.service.PrerequisiteService;
 import com.course_aura_hub.learner.service.LearnerStats;
 import com.course_aura_hub.learner.service.LearnerStatsService;
 import com.course_aura_hub.learner.service.WishlistService;
@@ -57,6 +58,7 @@ public class LearnerFacadeImpl implements LearnerFacade {
     private final LessonProgressService lessonProgressService;
     private final WishlistService wishlistService;
     private final LearnerStatsService learnerStatsService;
+    private final PrerequisiteService prerequisiteService;
 
     @Override
     @Transactional(readOnly = true)
@@ -78,6 +80,7 @@ public class LearnerFacadeImpl implements LearnerFacade {
         }
 
         Student student = learnerAccountService.currentStudent(email);
+        prerequisiteService.requireMet(student.getId(), course.getId());
         EnrollmentResponse enrollment = enrollmentService.create(
                 new EnrollmentCreateRequest(student.getId(), course.getId(), BigDecimal.ZERO, null)
         );

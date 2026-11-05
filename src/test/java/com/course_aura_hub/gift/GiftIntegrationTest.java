@@ -55,6 +55,12 @@ class GiftIntegrationTest extends LearnerIntegrationTestSupport {
         mockMvc.perform(asJson(registerUser(), post("/api/v1/me/access-codes/redeem"), Map.of("code", code)))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(as(buyer, get("/api/v1/me/gifts"))).andExpect(jsonPath("$.data[0].status").value("redeemed"));
+
+        // A redeemed gift can't be refunded, or the recipient would keep a course nobody paid for
+        mockMvc.perform(as(buyer, get("/api/v1/me/orders/" + order + "/refund-eligibility")))
+                .andExpect(jsonPath("$.data.canRequest").value(false));
+        mockMvc.perform(asJson(buyer, post("/api/v1/me/orders/" + order + "/refund-request"), Map.of("reason", "Changed my mind")))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
