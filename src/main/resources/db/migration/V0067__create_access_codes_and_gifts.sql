@@ -1,4 +1,4 @@
--- V0062: Redeemable access codes. Admins issue batches of them; a learner buying a course as a gift gets one made
+-- V0067: Redeemable access codes. Admins issue batches of them; a learner buying a course as a gift gets one made
 -- for the recipient once the order is paid. Codes are stored as HMAC hashes, like other secrets.
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS gift boolean NOT NULL DEFAULT false;

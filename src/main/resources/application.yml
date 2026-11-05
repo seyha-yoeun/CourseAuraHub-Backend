@@ -137,6 +137,13 @@ app:
     # Frontend origin that notification links open in
     app-url: ${TELEGRAM_APP_URL:http://localhost:3000}
 
+  refunds:
+    # Learners ask for refunds in the app. Inside the window and below the progress limit they're refunded at once.
+    enabled: ${REFUNDS_ENABLED:true}
+    window-days: ${REFUND_WINDOW_DAYS:14}
+    max-progress-percent: ${REFUND_MAX_PROGRESS_PERCENT:30}
+    auto-approve: ${REFUND_AUTO_APPROVE:true}
+
   demo-data:
     # Opt-in demo data: the bundled mock catalog, then the full-lifecycle seed (demo/lifecycle-seed.sql) with
     # accounts for every role. Never overwrites existing rows and only runs once.
@@ -168,6 +175,14 @@ app:
     # Push live notifications to streams on every instance over Postgres LISTEN/NOTIFY (holds one DB connection)
     cluster-fanout: ${NOTIFICATION_CLUSTER_FANOUT:true}
     max-streams-per-user: ${NOTIFICATION_MAX_STREAMS_PER_USER:5}
+    email:
+      # Email notifications (instant or a daily digest, per type and per user). The in-app feed is unaffected.
+      enabled: ${NOTIFICATION_EMAILS_ENABLED:true}
+      # Frontend origin for links, and the public API origin for one-click unsubscribe links
+      app-url: ${APP_URL:http://localhost:3000}
+      api-url: ${PUBLIC_API_URL:http://localhost:8080}
+      digest-cron: ${NOTIFICATION_DIGEST_CRON:0 0 18 * * *}
+      digest-max-items: ${NOTIFICATION_DIGEST_MAX_ITEMS:20}
 
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}

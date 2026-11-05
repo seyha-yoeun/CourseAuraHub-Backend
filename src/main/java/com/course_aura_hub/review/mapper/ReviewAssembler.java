@@ -18,7 +18,10 @@ public class ReviewAssembler {
                 review.getStudent().getName(),
                 review.getStudent().getAvatar(),
                 review.getCreatedAt(),
-                review.getUpdatedAt()
+                review.getUpdatedAt(),
+                review.getHelpfulCount() == null ? 0 : review.getHelpfulCount(),
+                review.getReply() == null ? null
+                        : new ReviewResponse.Reply(review.getReply(), review.getReplyAuthorName(), review.getRepliedAt())
         );
     }
 }
