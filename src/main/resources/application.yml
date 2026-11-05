@@ -138,9 +138,12 @@ app:
     app-url: ${TELEGRAM_APP_URL:http://localhost:3000}
 
   demo-data:
-    # Opt-in import of the bundled frontend mock dataset. Never overwrites existing rows.
+    # Opt-in demo data: the bundled mock catalog, then the full-lifecycle seed (demo/lifecycle-seed.sql) with
+    # accounts for every role. Never overwrites existing rows and only runs once.
     enabled: ${DEMO_DATA_ENABLED:false}
     file: ${DEMO_DATA_FILE:demo/demo-data.json}
+    # Sign-in password of every lifecycle demo account (admin@demo.courseaurahub.io and others). Local use only.
+    password: ${DEMO_PASSWORD:Demo@2026!}
 
   oauth2:
     # URL to redirect the user after OAuth2 login succeeds (clean redirect, tokens in cookies)
