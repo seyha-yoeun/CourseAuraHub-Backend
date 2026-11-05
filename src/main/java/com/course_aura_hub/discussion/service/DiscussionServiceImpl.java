@@ -54,7 +54,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         Lesson lesson = findLesson(lessonId);
         Course course = lesson.getSection().getCourse();
         requireAccess(actor, course);
-        return questionRepository.findByLessonIdOrderByCreatedAtDescIdDesc(lessonId).stream()
+        return questionRepository.findByLessonIdAndHiddenFalseOrderByCreatedAtDescIdDesc(lessonId).stream()
                 .map(question -> toResponse(question, course, actor))
                 .toList();
     }
@@ -149,7 +149,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 Sort.by(Sort.Direction.DESC, "createdAt", "id")
         );
         Page<LessonQuestion> questions = actor.admin()
-                ? questionRepository.findByResolvedFalse(request)
+                ? questionRepository.findByResolvedFalseAndHiddenFalse(request)
                 : questionRepository.findOpenByCourseOwner(actor.userId(), request);
         return new OpenQuestionPageResponse(
                 questions.map(this::toOpenResponse).getContent(),
@@ -203,7 +203,8 @@ public class DiscussionServiceImpl implements DiscussionService {
                 question.isResolved(),
                 question.getCreatedAt(),
                 Objects.equals(question.getAuthorId(), actor.userId()) || courseAccess.canManage(course, actor),
-                question.getAnswers().stream().map(answer -> toResponse(answer, course, actor)).toList()
+                question.getAnswers().stream().filter(answer -> !answer.isHidden())
+                        .map(answer -> toResponse(answer, course, actor)).toList()
         );
     }
 
@@ -229,7 +230,7 @@ public class DiscussionServiceImpl implements DiscussionService {
                 course.getTitle(),
                 question.getAuthorName(),
                 question.getBody(),
-                question.getAnswers().size(),
+                (int) question.getAnswers().stream().filter(answer -> !answer.isHidden()).count(),
                 question.getCreatedAt()
         );
     }

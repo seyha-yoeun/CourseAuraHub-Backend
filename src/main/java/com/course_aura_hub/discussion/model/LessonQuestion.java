@@ -59,6 +59,11 @@ public class LessonQuestion {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Hidden by moderation after a report. */
+    @Builder.Default
+    @Column(name = "hidden", nullable = false)
+    private boolean hidden = false;
+
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt asc, id asc")
     @BatchSize(size = 50)
