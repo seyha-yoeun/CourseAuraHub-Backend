@@ -116,6 +116,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // The category list the catalog and course forms read
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories").permitAll()
+                        // Public instructor pages
+                        .requestMatchers(HttpMethod.GET, "/api/v1/instructors", "/api/v1/instructors/*").permitAll()
                         // Client-safe platform branding
                         .requestMatchers(HttpMethod.GET, "/api/v1/settings/public").permitAll()
                         // Admin-only management resources
