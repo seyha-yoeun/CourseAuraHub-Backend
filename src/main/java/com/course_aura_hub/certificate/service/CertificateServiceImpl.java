@@ -8,6 +8,7 @@ import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.course.repository.CourseRepository;
 import com.course_aura_hub.learner.service.LearnerAccountService;
+import com.course_aura_hub.learningpath.repository.LearningPathCertificateRepository;
 import com.course_aura_hub.notification.model.NotificationType;
 import com.course_aura_hub.notification.service.NotificationService;
 import com.course_aura_hub.settings.service.SettingsService;
@@ -26,6 +27,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class CertificateServiceImpl implements CertificateService {
 
+    private static final String PATH_ISSUER = "CourseAuraHub learning path";
+
     private final CourseCertificateRepository certificateRepository;
     private final CertificateNumberGenerator numberGenerator;
     private final CertificateMapper certificateMapper;
@@ -35,6 +38,7 @@ public class CertificateServiceImpl implements CertificateService {
     private final NotificationService notificationService;
     private final CertificatePdfRenderer pdfRenderer;
     private final SettingsService settingsService;
+    private final LearningPathCertificateRepository pathCertificateRepository;
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -103,9 +107,15 @@ public class CertificateServiceImpl implements CertificateService {
     @Override
     @Transactional(readOnly = true)
     public CertificateVerificationResponse verify(String certificateNumber) {
-        return Optional.ofNullable(CertificateNumberGenerator.normalize(certificateNumber))
+        Optional<String> number = Optional.ofNullable(CertificateNumberGenerator.normalize(certificateNumber));
+        return number
                 .flatMap(certificateRepository::findByCertificateNumber)
                 .map(certificateMapper::toVerificationResponse)
+                // Learning path certificates share the number format and the public check
+                .or(() -> number.flatMap(pathCertificateRepository::findByCertificateNumber)
+                        .map(path -> new CertificateVerificationResponse(
+                                path.getCertificateNumber(), path.getLearnerName(), path.getPathTitle(),
+                                PATH_ISSUER, path.getIssuedAt())))
                 .orElseThrow(() -> new ResourceNotFoundException("Certificate not found"));
     }
 
