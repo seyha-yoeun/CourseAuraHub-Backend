@@ -27,7 +27,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `course` | Course catalog (admin CRUD, public read), scheduled sale prices | `/api/v1/courses`, `/api/v1/admin/discounts` (ADMIN) |
 | `student` | Admin student management | `/api/v1/students` (ADMIN) |
 | `enrollment` | Admin enrollments; keeps counters + monthly metrics in sync | `/api/v1/enrollments` (ADMIN) |
-| `dashboard` | Admin stats | `/api/v1/stats` (ADMIN) |
+| `dashboard` | Admin stats; anonymous catalog events, the enrollment funnel and retention cohorts | `/api/v1/stats`, `/api/v1/stats/funnel`, `/api/v1/stats/retention` (ADMIN), `/api/v1/events` (public) |
 | `settings` | Platform settings (single row) | `/api/v1/settings` |
 | `learner` | Self-service: my courses, self-enroll, dashboard, achievements, profile, password, wishlist | `/api/v1/me` |
 | `certificate` | Completion certificates, PDF download, public verification | `/api/v1/me/certificates`, `/api/v1/me/certificates/{number}/pdf`, `/api/v1/certificates/{number}` (public) |
@@ -79,6 +79,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Top-up requests**: a request moves no money. Approval credits the card through `MemberCardService.creditTopUp`, with `TOPUP-{id}` as the ledger reference.
 - **Required assignments**: a lesson with a required assignment can only be completed by a passing grade, which `AssignmentService.grade` applies through `LessonProgressService.completeForStudent`.
 - **Account deletion** (`AccountPrivacyServiceImpl`) anonymizes instead of deleting rows: orders, member card ledgers and certificates are kept under "Deleted learner". When you add a table holding personal data, add it to both the export queries and the deletion steps.
+- **Catalog events** (`POST /api/v1/events`) are public, CSRF-exempt and not audited. They store only an HMAC of the user id, the browser's random id or the address (`app.analytics.visitor-salt`), never the raw value, and are rate-limited per address in `CatalogAnalyticsServiceImpl`.
 - **Logging**: the console stays human-readable; `logs/course-aura-hub.log` is Logstash JSON and Alloy ships it to Loki (`docs/logging.md`). `RequestLoggingFilter` logs method, path, status and duration and sets the `requestId` MDC value. Never add query strings, headers, cookies or bodies to it. `docker compose down -v` also deletes Postgres data.
 
 ## Roadmap (not yet built)

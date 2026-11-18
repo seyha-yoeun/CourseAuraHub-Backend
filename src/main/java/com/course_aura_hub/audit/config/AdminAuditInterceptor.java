@@ -102,7 +102,9 @@ public class AdminAuditInterceptor implements HandlerInterceptor {
         return pattern.startsWith(API_PREFIX)
                 && !pattern.startsWith(API_PREFIX + "auth")
                 && !pattern.startsWith(API_PREFIX + "me/")
-                && !pattern.equals(API_PREFIX + "me");
+                && !pattern.equals(API_PREFIX + "me")
+                // Anonymous page-view analytics, not a change to anything
+                && !pattern.equals(API_PREFIX + "events");
     }
 
     /** The first literal segment after /api/v1 and an optional admin/instructor scope, such as "coupons". */
