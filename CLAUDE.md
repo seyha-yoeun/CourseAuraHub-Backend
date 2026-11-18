@@ -45,6 +45,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `assignment` | Assignments, submissions and grading | `/api/v1/me/lessons/{id}/assignment`, `/api/v1/instructor/lessons/{id}/assignment`, `/api/v1/instructor/submissions` |
 | `instructor` | An instructor's own courses, and the admin review that publishes them | `/api/v1/instructor`, `/api/v1/admin/course-reviews` |
 | `reminder` | Nudges to return to an unfinished course | `/api/v1/me/reminders` |
+| `payout` | Instructor earnings from sales of courses they own, payout requests and admin review, per-course revenue share | `/api/v1/instructor/earnings`, `/api/v1/instructor/payouts`, `/api/v1/admin/payouts`, `/api/v1/admin/courses/{slug}/revenue-share` |
 | `privacy` | Personal data export and self-service account deletion | `/api/v1/me/data-export`, `/api/v1/me/account/deletion` |
 | `common` | `ApiResponse`, shared exceptions + `DomainExceptionHandler`, `SecurityUtils` | — |
 | `config` | Demo data seeder, domain config properties | — |
@@ -78,6 +79,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Private file references**: any endpoint that stores a `storage://` value from a caller must call `FileService.requireOwned` first (`CourseAccess.requireUsableFile` for lessons). Stored references get signed links, so skipping this lets someone read another person's private file.
 - **Top-up requests**: a request moves no money. Approval credits the card through `MemberCardService.creditTopUp`, with `TOPUP-{id}` as the ledger reference.
 - **Required assignments**: a lesson with a required assignment can only be completed by a passing grade, which `AssignmentService.grade` applies through `LessonProgressService.completeForStudent`.
+- **Instructor earnings** come from `OrderPaid` and `OrderRefunded`, which `OrderServiceImpl` publishes inside the payment and refund transactions; `EarningServiceImpl` listens to them. Only courses with an `owner_id` earn. A refund before the money is claimed reverses the sale; after that it adds a negative `REFUND` row that comes off the next payout, so never edit a claimed or paid earning. A payout claims every available row under a row lock, and only one payout per instructor can be open.
 - **Account deletion** (`AccountPrivacyServiceImpl`) anonymizes instead of deleting rows: orders, member card ledgers and certificates are kept under "Deleted learner". When you add a table holding personal data, add it to both the export queries and the deletion steps.
 - **Logging**: the console stays human-readable; `logs/course-aura-hub.log` is Logstash JSON and Alloy ships it to Loki (`docs/logging.md`). `RequestLoggingFilter` logs method, path, status and duration and sets the `requestId` MDC value. Never add query strings, headers, cookies or bodies to it. `docker compose down -v` also deletes Postgres data.
 

@@ -84,6 +84,16 @@ public class ExportController {
         write(response, "audit-log", out -> exportService.auditLog(out, from, to));
     }
 
+    @GetMapping(ADMIN + "/payouts.csv")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Payouts CSV", description = "Admin-only. Instructor payout requests; account details are left out.")
+    public void payouts(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                        HttpServletResponse response) throws IOException {
+        requireRange(from, to);
+        write(response, "payouts", out -> exportService.payouts(out, from, to));
+    }
+
     @GetMapping("/api/v1/instructor/courses/{slug}/exports/learners.csv")
     @PreAuthorize("hasAnyRole('ADMIN', 'INSTRUCTOR')")
     @Operation(summary = "Course learners CSV", description = "Admins and the course's instructor. Names and progress, never emails.")

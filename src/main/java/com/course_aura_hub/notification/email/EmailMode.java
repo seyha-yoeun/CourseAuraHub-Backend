@@ -29,7 +29,7 @@ public enum EmailMode {
      */
     public static EmailMode defaultFor(NotificationType type) {
         return switch (type) {
-            case CERTIFICATE_ISSUED, ORDER_REFUNDED, PAYMENT_FAILED, MEMBER_CARD, ASSIGNMENT -> INSTANT;
+            case CERTIFICATE_ISSUED, ORDER_REFUNDED, PAYMENT_FAILED, MEMBER_CARD, PAYOUT, ASSIGNMENT -> INSTANT;
             case WEEKLY_REPORT -> OFF;
             default -> DIGEST;
         };
