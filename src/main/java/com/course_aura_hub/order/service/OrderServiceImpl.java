@@ -479,6 +479,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus(OrderStatus.PAID);
         order.setPaidAt(Instant.now());
         order.setCheckoutUrl(null);
+        eventPublisher.publishEvent(new OrderPaid(order.getId()));
 
         // A gift enrolls nobody yet: its code is issued for the recipient in this transaction
         if (order.isGift()) {
@@ -569,6 +570,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.REFUNDED);
         order.setRefundedAt(Instant.now());
+        eventPublisher.publishEvent(new OrderRefunded(order.getId()));
         if (order.isGift()) {
             // An unused gift code stops working; a redeemed one keeps the recipient's access
             eventPublisher.publishEvent(new GiftOrderRefunded(order.getId()));

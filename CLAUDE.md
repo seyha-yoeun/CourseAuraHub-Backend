@@ -41,6 +41,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `review` | Course reviews and ratings | `/api/v1/courses/{slug}/reviews`, `/api/v1/me/courses/{slug}/review` |
 | `discussion` | Lesson questions and answers, staff inbox | `/api/v1/me/lessons/{id}/questions`, `/api/v1/me/questions`, `/api/v1/instructor/questions` |
 | `note` | Private lesson notes and video bookmarks | `/api/v1/me/lessons/{id}/notes`, `/api/v1/me/notes` |
+| `referral` | Referral codes, claims by new users, member card rewards after the first paid order | `/api/v1/me/referral`, `/api/v1/me/referral/claim`, `/api/v1/admin/referrals` |
 | `category` | Managed course categories | `/api/v1/categories` (public), `/api/v1/admin/categories` |
 | `assignment` | Assignments, submissions and grading | `/api/v1/me/lessons/{id}/assignment`, `/api/v1/instructor/lessons/{id}/assignment`, `/api/v1/instructor/submissions` |
 | `instructor` | An instructor's own courses, and the admin review that publishes them | `/api/v1/instructor`, `/api/v1/admin/course-reviews` |
@@ -76,6 +77,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 
 - **Course access**: decide who manages a course with `CourseAccess` (`@courseAccess` in `@PreAuthorize`), not `isAdmin`: instructors manage only courses with their `owner_id`. Courses without an owner are admin-managed. Only admin approval publishes an instructor's course, so never let the instructor routes set a status. Instructors must never see learner emails or spending.
 - **Private file references**: any endpoint that stores a `storage://` value from a caller must call `FileService.requireOwned` first (`CourseAccess.requireUsableFile` for lessons). Stored references get signed links, so skipping this lets someone read another person's private file.
+- **Referral rewards**: a referral qualifies on the referee's first paid order (`OrderPaid`) and is undone by its refund (`OrderRefunded`). `ReferralRewardJob` credits the referrer through `MemberCardService.creditTopUp` with reference `REFERRAL-{id}` only after `app.referrals.hold-days`, so a refund never has to take money back. Referrers without a member card stay qualified until they have one.
 - **Top-up requests**: a request moves no money. Approval credits the card through `MemberCardService.creditTopUp`, with `TOPUP-{id}` as the ledger reference.
 - **Required assignments**: a lesson with a required assignment can only be completed by a passing grade, which `AssignmentService.grade` applies through `LessonProgressService.completeForStudent`.
 - **Account deletion** (`AccountPrivacyServiceImpl`) anonymizes instead of deleting rows: orders, member card ledgers and certificates are kept under "Deleted learner". When you add a table holding personal data, add it to both the export queries and the deletion steps.

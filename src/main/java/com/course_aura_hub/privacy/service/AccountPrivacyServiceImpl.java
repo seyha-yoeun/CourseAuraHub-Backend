@@ -120,6 +120,8 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         }
         jdbc.update("update orders set status = 'CANCELLED', checkout_url = null "
                 + "where student_id = :studentId and status = 'PENDING'", params);
+        // The code stops working; referrals stay as records of rewards already paid
+        jdbc.update("delete from referral_codes where user_id = :userId", params);
         jdbc.update("update lesson_questions set author_id = null, author_name = :name where author_id = :userId",
                 params.addValue("name", DELETED_NAME));
         jdbc.update("update lesson_answers set author_id = null, author_name = :name where author_id = :userId", params);
@@ -179,6 +181,10 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                        o.discount_amount as "discountAmount", o.amount, o.currency, o.status, o.provider,
                        o.created_at as "createdAt", o.paid_at as "paidAt", o.refunded_at as "refundedAt"
                 from orders o join courses c on c.id = o.course_id where o.student_id = :studentId order by o.created_at""");
+        queries.put("referrals", """
+                select r.status, r.reward_amount as "rewardAmount", r.created_at as "createdAt",
+                       r.rewarded_at as "rewardedAt"
+                from referrals r where r.referrer_user_id = :userId order by r.created_at""");
         queries.put("certificates", """
                 select certificate_number as "certificateNumber", course_title as "courseTitle", issued_at as "issuedAt"
                 from course_certificates where student_id = :studentId order by issued_at""");

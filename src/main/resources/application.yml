@@ -141,6 +141,15 @@ app:
     # Fields an instructor may change on a live course without admin review; anything else waits as a revision
     immediate-fields: ${COURSE_REVISION_IMMEDIATE_FIELDS:tags,thumbnail}
 
+  referrals:
+    # Learners share a code; the referrer's member card is credited after a new learner's first paid order
+    enabled: ${REFERRALS_ENABLED:true}
+    reward-amount: ${REFERRAL_REWARD_AMOUNT:5.00}
+    # Days after that payment before the reward; keep it at least the refund window
+    hold-days: ${REFERRAL_HOLD_DAYS:14}
+    claim-window-days: ${REFERRAL_CLAIM_WINDOW_DAYS:14}
+    link-base-url: ${REFERRAL_LINK_BASE_URL:http://localhost:3000/auth/register}
+
   organizations:
     # Frontend page that accepts an organization invitation; the token is appended as ?token=
     invite-url: ${ORGANIZATION_INVITE_URL:http://localhost:3000/organizations/join}
