@@ -43,6 +43,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `note` | Private lesson notes and video bookmarks | `/api/v1/me/lessons/{id}/notes`, `/api/v1/me/notes` |
 | `category` | Managed course categories | `/api/v1/categories` (public), `/api/v1/admin/categories` |
 | `assignment` | Assignments, submissions and grading | `/api/v1/me/lessons/{id}/assignment`, `/api/v1/instructor/lessons/{id}/assignment`, `/api/v1/instructor/submissions` |
+| `live` | Scheduled live classes, join-to-get-link attendance, reminders and a private ICS calendar feed | `/api/v1/instructor/courses/{slug}/live-sessions`, `/api/v1/me/live-sessions`, `/api/v1/me/calendar-token`, `/api/v1/calendar/{token}.ics` (public) |
 | `instructor` | An instructor's own courses, and the admin review that publishes them | `/api/v1/instructor`, `/api/v1/admin/course-reviews` |
 | `reminder` | Nudges to return to an unfinished course | `/api/v1/me/reminders` |
 | `privacy` | Personal data export and self-service account deletion | `/api/v1/me/data-export`, `/api/v1/me/account/deletion` |
@@ -75,6 +76,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
 
 - **Course access**: decide who manages a course with `CourseAccess` (`@courseAccess` in `@PreAuthorize`), not `isAdmin`: instructors manage only courses with their `owner_id`. Courses without an owner are admin-managed. Only admin approval publishes an instructor's course, so never let the instructor routes set a status. Instructors must never see learner emails or spending.
+- **Live sessions**: learners never get `meeting_url` from a listing, only from `join`, which records attendance; calendar events link to the app, not the meeting. Calendar feeds are public URLs authorised by a token stored only as a `TokenHasher` hash.
 - **Private file references**: any endpoint that stores a `storage://` value from a caller must call `FileService.requireOwned` first (`CourseAccess.requireUsableFile` for lessons). Stored references get signed links, so skipping this lets someone read another person's private file.
 - **Top-up requests**: a request moves no money. Approval credits the card through `MemberCardService.creditTopUp`, with `TOPUP-{id}` as the ledger reference.
 - **Required assignments**: a lesson with a required assignment can only be completed by a passing grade, which `AssignmentService.grade` applies through `LessonProgressService.completeForStudent`.

@@ -133,6 +133,7 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                     """, params.addValue("studentEmail", "deleted-student-" + studentId + "@deleted.invalid"));
         }
 
+        jdbc.update("delete from calendar_tokens where user_id = :userId", params);
         refreshSessionService.revokeAllSessions(userId, SessionRevocationReason.ACCOUNT_DELETED);
         user.setEmail(("deleted-" + userId + "@deleted.invalid").toLowerCase(Locale.ROOT));
         user.setFirstName("Deleted");
@@ -182,6 +183,9 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         queries.put("certificates", """
                 select certificate_number as "certificateNumber", course_title as "courseTitle", issued_at as "issuedAt"
                 from course_certificates where student_id = :studentId order by issued_at""");
+        queries.put("liveAttendance", """
+                select s.title, s.starts_at as "startsAt", a.joined_at as "joinedAt" from live_attendance a
+                join live_sessions s on s.id = a.session_id where a.student_id = :studentId order by a.joined_at""");
         queries.put("lessonProgress", """
                 select l.title as lesson, lp.completed_at as "completedAt" from lesson_progress lp
                 join lessons l on l.id = lp.lesson_id where lp.student_id = :studentId order by lp.completed_at""");
