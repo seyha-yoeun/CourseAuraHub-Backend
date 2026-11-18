@@ -123,6 +123,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         // The category list the catalog and course forms read
                         .requestMatchers(HttpMethod.GET, "/api/v1/categories").permitAll()
+                        // Subscription plans are part of the public pricing page
+                        .requestMatchers(HttpMethod.GET, "/api/v1/subscription-plans").permitAll()
                         // Public instructor pages
                         .requestMatchers(HttpMethod.GET, "/api/v1/instructors", "/api/v1/instructors/*").permitAll()
                         // Client-safe platform branding

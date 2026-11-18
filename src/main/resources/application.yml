@@ -164,6 +164,12 @@ app:
     # URL to redirect the user after OAuth2 login succeeds (clean redirect, tokens in cookies)
     redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/oauth2/redirect}
 
+  subscriptions:
+    # All-access plans, managed by admins. Unpaid renewals keep access for the grace period.
+    enabled: ${SUBSCRIPTIONS_ENABLED:true}
+    grace-days: ${SUBSCRIPTION_GRACE_DAYS:3}
+    pending-timeout-hours: ${SUBSCRIPTION_PENDING_TIMEOUT_HOURS:24}
+
   cookie:
     secure: ${COOKIE_SECURE:false}
     same-site: ${COOKIE_SAME_SITE:lax}

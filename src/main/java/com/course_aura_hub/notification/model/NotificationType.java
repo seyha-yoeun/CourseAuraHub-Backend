@@ -4,6 +4,7 @@ import java.util.Locale;
 
 public enum NotificationType {
     ENROLLED,
+    SUBSCRIPTION,
     PAYMENT_FAILED,
     ORDER_REFUNDED,
     REFUND_REQUEST,

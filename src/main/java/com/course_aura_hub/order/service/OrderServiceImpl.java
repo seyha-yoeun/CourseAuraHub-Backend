@@ -27,6 +27,7 @@ import com.course_aura_hub.order.model.Order;
 import com.course_aura_hub.order.model.OrderGroup;
 import com.course_aura_hub.order.model.OrderStatus;
 import com.course_aura_hub.order.payment.PaymentEvent;
+import com.course_aura_hub.order.payment.PaymentEventHandler;
 import com.course_aura_hub.order.payment.PaymentGateway;
 import com.course_aura_hub.order.payment.PaymentMethod;
 import com.course_aura_hub.order.payment.PaymentSession;
@@ -38,6 +39,7 @@ import com.course_aura_hub.student.repository.StudentCourseRepository;
 import com.course_aura_hub.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -78,6 +80,7 @@ public class OrderServiceImpl implements OrderService {
     private final SettingsService settingsService;
     private final ApplicationEventPublisher eventPublisher;
     private final PrerequisiteService prerequisiteService;
+    private final ObjectProvider<PaymentEventHandler> paymentEventHandlers;
 
     @Override
     @Transactional
@@ -415,6 +418,14 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void applyPaymentEvent(PaymentEvent event) {
+        // Payments other modules own, such as subscriptions, share the provider and its webhook
+        Optional<PaymentEventHandler> handler = paymentEventHandlers.orderedStream()
+                .filter(candidate -> candidate.supports(event.orderNumber()))
+                .findFirst();
+        if (handler.isPresent()) {
+            handler.get().apply(event);
+            return;
+        }
         if (event.orderNumber().startsWith(GROUP_PREFIX)) {
             applyGroupPaymentEvent(event);
             return;

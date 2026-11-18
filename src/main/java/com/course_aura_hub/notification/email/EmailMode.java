@@ -31,6 +31,8 @@ public enum EmailMode {
         return switch (type) {
             case CERTIFICATE_ISSUED, ORDER_REFUNDED, PAYMENT_FAILED, MEMBER_CARD, ASSIGNMENT -> INSTANT;
             case WEEKLY_REPORT -> OFF;
+            // Subscription billing is about money, like payments
+            case SUBSCRIPTION -> INSTANT;
             default -> DIGEST;
         };
     }
