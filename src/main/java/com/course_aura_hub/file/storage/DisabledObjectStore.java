@@ -2,6 +2,7 @@ package com.course_aura_hub.file.storage;
 
 import com.course_aura_hub.common.exception.ServiceUnavailableException;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -33,6 +34,21 @@ public class DisabledObjectStore implements ObjectStore {
 
     @Override
     public void move(String fromKey, String toKey) {
+        throw disabled();
+    }
+
+    @Override
+    public byte[] read(String key, int maxBytes) {
+        throw disabled();
+    }
+
+    @Override
+    public void download(String key, Path target) {
+        throw disabled();
+    }
+
+    @Override
+    public void upload(String key, Path source, String contentType) {
         throw disabled();
     }
 

@@ -1,5 +1,6 @@
 package com.course_aura_hub.file.storage;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -17,6 +18,15 @@ public interface ObjectStore {
     byte[] readStart(String key, int length);
 
     void move(String fromKey, String toKey);
+
+    /** The whole object, refused when it is larger than {@code maxBytes}. For small text such as playlists. */
+    byte[] read(String key, int maxBytes);
+
+    /** Saves the object to a local file, for server-side processing such as transcoding. */
+    void download(String key, Path target);
+
+    /** Stores a local file under this key. */
+    void upload(String key, Path source, String contentType);
 
     void delete(String key);
 }

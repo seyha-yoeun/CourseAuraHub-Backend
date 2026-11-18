@@ -98,6 +98,16 @@ app:
     currency: ${PAYMENT_CURRENCY:USD}
     webhook-secret: ${PAYMENT_WEBHOOK_SECRET:}
 
+  video:
+    # HLS transcoding of uploaded lesson videos. Needs ffmpeg and ffprobe on the server, so it is off by default;
+    # videos play their original file until a stream is ready.
+    transcoding-enabled: ${VIDEO_TRANSCODING_ENABLED:false}
+    ffmpeg-path: ${VIDEO_FFMPEG_PATH:ffmpeg}
+    ffprobe-path: ${VIDEO_FFPROBE_PATH:ffprobe}
+    segment-seconds: ${VIDEO_SEGMENT_SECONDS:6}
+    # Signed playlist, segment and caption links
+    link-ttl: ${VIDEO_LINK_TTL:3h}
+
   storage:
     # S3-compatible storage. Defaults match the MinIO in docker-compose; a blank endpoint turns uploads off.
     endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}
