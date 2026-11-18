@@ -115,7 +115,7 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
             jdbc.update("delete from " + table + " where user_id = :userId", params);
         }
         // Learner extras that are not records of money or achievement
-        for (String table : List.of("wishlist_items", "cart_items", "lesson_notes", "learner_reminders")) {
+        for (String table : List.of("wishlist_items", "cart_items", "lesson_notes", "learner_reminders", "learner_goals")) {
             jdbc.update("delete from " + table + " where student_id = :studentId", params);
         }
         jdbc.update("update orders set status = 'CANCELLED', checkout_url = null "
@@ -201,6 +201,10 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                 select q.body, q.resolved, q.created_at as "createdAt" from lesson_questions q where q.author_id = :userId""");
         queries.put("answers", """
                 select a.body, a.created_at as "createdAt" from lesson_answers a where a.author_id = :userId""");
+        queries.put("learningGoal", """
+                select weekly_lessons_target as "weeklyLessonsTarget", leaderboard_visible as "leaderboardVisible",
+                       updated_at as "updatedAt"
+                from learner_goals where student_id = :studentId""");
         queries.put("wishlist", """
                 select c.slug, w.created_at as "createdAt" from wishlist_items w
                 join courses c on c.id = w.course_id where w.student_id = :studentId""");
