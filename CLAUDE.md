@@ -30,7 +30,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `dashboard` | Admin stats | `/api/v1/stats` (ADMIN) |
 | `settings` | Platform settings (single row) | `/api/v1/settings` |
 | `learner` | Self-service: my courses, self-enroll, dashboard, achievements, profile, password, wishlist | `/api/v1/me` |
-| `certificate` | Completion certificates, PDF download, public verification | `/api/v1/me/certificates`, `/api/v1/me/certificates/{number}/pdf`, `/api/v1/certificates/{number}` (public) |
+| `certificate` | Completion certificates, PDF download, public verification | `/api/v1/me/certificates`, `/api/v1/me/certificates/{number}/pdf`, `/api/v1/certificates/{number}` (public), Open Badges `/api/v1/certificates/{number}/badge.json` and `/api/v1/badges/**` (public), `/api/v1/me/certificates/{number}/linkedin-url` |
 | `curriculum` | Sections, lessons, lesson progress, video resume | `/api/v1/courses/{slug}/curriculum`, `/api/v1/me/lessons` |
 | `order` | Checkout, order history, refunds, PDF receipts, `PaymentGateway` port | `/api/v1/me/orders`, `/api/v1/me/orders/{number}/receipt`, `/api/v1/admin/orders`, `/api/v1/admin/orders/{number}/receipt`, `/api/v1/payments/webhooks/{provider}` |
 | `coupon` | Discount codes; redemptions are derived from orders | `/api/v1/me/coupons/preview`, `/api/v1/admin/coupons` |
