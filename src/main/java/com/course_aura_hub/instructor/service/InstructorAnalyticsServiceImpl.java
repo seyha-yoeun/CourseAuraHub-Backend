@@ -17,6 +17,8 @@ import com.course_aura_hub.instructor.repository.InstructorAnalyticsRepository.L
 import com.course_aura_hub.instructor.repository.InstructorAnalyticsRepository.LessonStats;
 import com.course_aura_hub.instructor.repository.InstructorAnalyticsRepository.RatingCount;
 import com.course_aura_hub.instructor.repository.InstructorAnalyticsRepository.SubmissionStats;
+import com.course_aura_hub.survey.dto.SurveyDtos;
+import com.course_aura_hub.survey.service.SurveyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +43,7 @@ public class InstructorAnalyticsServiceImpl implements InstructorAnalyticsServic
 
     private final CourseAccess courseAccess;
     private final InstructorAnalyticsRepository analyticsRepository;
+    private final SurveyService surveyService;
 
     @Override
     public CourseAnalyticsResponse courseAnalytics(Actor actor, String slug) {
@@ -58,8 +61,14 @@ public class InstructorAnalyticsServiceImpl implements InstructorAnalyticsServic
                 reviews(analyticsRepository.findRatingCounts(courseId)),
                 assignments(analyticsRepository.findSubmissionStats(courseId)),
                 monthly(course),
-                funnel(analyticsRepository.findLessonStats(courseId), enrolled)
+                funnel(analyticsRepository.findLessonStats(courseId), enrolled),
+                feedback(courseId)
         );
+    }
+
+    private CourseAnalyticsResponse.Feedback feedback(Integer courseId) {
+        SurveyDtos.Feedback feedback = surveyService.feedback(courseId);
+        return new CourseAnalyticsResponse.Feedback(feedback.responses(), feedback.nps());
     }
 
     private List<LessonFunnel> funnel(List<LessonStats> rows, long enrolled) {

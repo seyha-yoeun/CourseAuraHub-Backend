@@ -123,6 +123,9 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         jdbc.update("update lesson_questions set author_id = null, author_name = :name where author_id = :userId",
                 params.addValue("name", DELETED_NAME));
         jdbc.update("update lesson_answers set author_id = null, author_name = :name where author_id = :userId", params);
+        // Survey answers were given in confidence, so they go rather than stay anonymized
+        jdbc.update("delete from survey_responses where student_id = :studentId", params);
+        jdbc.update("delete from survey_prompts where student_id = :studentId", params);
         jdbc.update("update course_certificates set learner_name = :name where student_id = :studentId", params);
         jdbc.update("update member_cards set holder_name = :name where student_id = :studentId", params);
         if (studentId != null) {
@@ -191,6 +194,10 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         queries.put("assignmentSubmissions", """
                 select s.file_name as "fileName", s.comment, s.status, s.score, s.feedback, s.submitted_at as "submittedAt"
                 from assignment_submissions s where s.student_id = :studentId""");
+        queries.put("surveyResponses", """
+                select c.slug, r.nps_score as "npsScore", r.answers::text as answers, r.created_at as "createdAt"
+                from survey_responses r join course_surveys s on s.id = r.survey_id join courses c on c.id = s.course_id
+                where r.student_id = :studentId order by r.created_at""");
         queries.put("reviews", """
                 select c.slug, r.rating, r.comment, r.created_at as "createdAt" from course_reviews r
                 join courses c on c.id = r.course_id where r.student_id = :studentId""");

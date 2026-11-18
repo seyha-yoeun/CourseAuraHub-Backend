@@ -12,8 +12,13 @@ public record CourseAnalyticsResponse(
         Reviews reviews,
         Assignments assignments,
         List<Month> monthly,
-        List<LessonFunnel> lessons
+        List<LessonFunnel> lessons,
+        Feedback feedback
 ) {
+
+    /** @param nps the course survey's net promoter score, or null without responses */
+    public record Feedback(long surveyResponses, Integer nps) {
+    }
 
     public record Learners(long enrolled, long completed, BigDecimal completionRate) {
     }

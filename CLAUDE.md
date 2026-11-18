@@ -44,6 +44,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `category` | Managed course categories | `/api/v1/categories` (public), `/api/v1/admin/categories` |
 | `assignment` | Assignments, submissions and grading | `/api/v1/me/lessons/{id}/assignment`, `/api/v1/instructor/lessons/{id}/assignment`, `/api/v1/instructor/submissions` |
 | `instructor` | An instructor's own courses, and the admin review that publishes them | `/api/v1/instructor`, `/api/v1/admin/course-reviews` |
+| `survey` | One feedback survey per course with a built-in NPS question; learners are asked once at half way or completion | `/api/v1/instructor/courses/{slug}/survey`, `/api/v1/me/courses/{slug}/survey` |
 | `reminder` | Nudges to return to an unfinished course | `/api/v1/me/reminders` |
 | `privacy` | Personal data export and self-service account deletion | `/api/v1/me/data-export`, `/api/v1/me/account/deletion` |
 | `common` | `ApiResponse`, shared exceptions + `DomainExceptionHandler`, `SecurityUtils` | — |
@@ -77,6 +78,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Course access**: decide who manages a course with `CourseAccess` (`@courseAccess` in `@PreAuthorize`), not `isAdmin`: instructors manage only courses with their `owner_id`. Courses without an owner are admin-managed. Only admin approval publishes an instructor's course, so never let the instructor routes set a status. Instructors must never see learner emails or spending.
 - **Private file references**: any endpoint that stores a `storage://` value from a caller must call `FileService.requireOwned` first (`CourseAccess.requireUsableFile` for lessons). Stored references get signed links, so skipping this lets someone read another person's private file.
 - **Top-up requests**: a request moves no money. Approval credits the card through `MemberCardService.creditTopUp`, with `TOPUP-{id}` as the ledger reference.
+- **Lesson completion event**: `LessonProgressServiceImpl` publishes `LessonCompleted` (with done and total lessons) inside the completing transaction. Surveys listen to it and record each prompt in `survey_prompts`, so a learner is asked once. Survey results are aggregates only; never return a response with who gave it.
 - **Required assignments**: a lesson with a required assignment can only be completed by a passing grade, which `AssignmentService.grade` applies through `LessonProgressService.completeForStudent`.
 - **Account deletion** (`AccountPrivacyServiceImpl`) anonymizes instead of deleting rows: orders, member card ledgers and certificates are kept under "Deleted learner". When you add a table holding personal data, add it to both the export queries and the deletion steps.
 - **Logging**: the console stays human-readable; `logs/course-aura-hub.log` is Logstash JSON and Alloy ships it to Loki (`docs/logging.md`). `RequestLoggingFilter` logs method, path, status and duration and sets the `requestId` MDC value. Never add query strings, headers, cookies or bodies to it. `docker compose down -v` also deletes Postgres data.

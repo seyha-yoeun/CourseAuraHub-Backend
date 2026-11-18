@@ -16,6 +16,7 @@ public enum NotificationType {
     LESSON_QUESTION,
     ASSIGNMENT,
     COURSE_REVIEW,
+    COURSE_SURVEY,
     COURSE_REMINDER,
     ANNOUNCEMENT,
     WEEKLY_REPORT;
