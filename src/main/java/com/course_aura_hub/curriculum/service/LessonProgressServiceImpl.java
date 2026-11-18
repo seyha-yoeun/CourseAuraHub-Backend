@@ -1,6 +1,8 @@
 package com.course_aura_hub.curriculum.service;
 
 import com.course_aura_hub.certificate.service.CertificateService;
+import com.course_aura_hub.coding.repository.CodeExerciseRepository;
+import com.course_aura_hub.coding.repository.CodeSubmissionRepository;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ForbiddenActionException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
@@ -55,6 +57,8 @@ public class LessonProgressServiceImpl implements LessonProgressService {
     private final CertificateService certificateService;
     private final QuizQuestionRepository quizQuestionRepository;
     private final QuizAttemptRepository quizAttemptRepository;
+    private final CodeExerciseRepository codeExerciseRepository;
+    private final CodeSubmissionRepository codeSubmissionRepository;
     private final AssignmentRepository assignmentRepository;
     private final AssignmentSubmissionRepository submissionRepository;
     private final LessonAvailability lessonAvailability;
@@ -71,6 +75,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
             lessonAvailability.requireAvailable(lesson, student.getId());
             requirePassedQuiz(lesson, student);
             requirePassedAssignment(lesson, student);
+            requirePassedExercise(lesson, student);
             lessonProgressRepository.save(LessonProgress.builder()
                     .student(student)
                     .lesson(lesson)
@@ -90,6 +95,15 @@ public class LessonProgressServiceImpl implements LessonProgressService {
                 && quizQuestionRepository.existsByLessonId(lesson.getId())
                 && !quizAttemptRepository.existsByStudentIdAndLessonIdAndPassedTrue(student.getId(), lesson.getId())) {
             throw new BusinessRuleException("Pass the quiz to complete this lesson");
+        }
+    }
+
+    /** A coding exercise is only completed by passing its tests, which finishes the lesson by itself. */
+    private void requirePassedExercise(Lesson lesson, Student student) {
+        if (lesson.getType() == LessonType.CODE
+                && codeExerciseRepository.existsById(lesson.getId())
+                && !codeSubmissionRepository.existsByStudentIdAndLessonIdAndPassedTrue(student.getId(), lesson.getId())) {
+            throw new BusinessRuleException("Pass the exercise's tests to complete this lesson");
         }
     }
 

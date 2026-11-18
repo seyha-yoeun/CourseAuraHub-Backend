@@ -134,6 +134,8 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         }
 
         refreshSessionService.revokeAllSessions(userId, SessionRevocationReason.ACCOUNT_DELETED);
+        // Submitted code is the learner's own work; completed lessons stay completed
+        jdbc.update("delete from code_submissions where student_id = :studentId", params);
         user.setEmail(("deleted-" + userId + "@deleted.invalid").toLowerCase(Locale.ROOT));
         user.setFirstName("Deleted");
         user.setLastName("user");
@@ -188,6 +190,11 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         queries.put("quizAttempts", """
                 select l.title as lesson, qa.score_percent as "scorePercent", qa.passed, qa.submitted_at as "submittedAt"
                 from quiz_attempts qa join lessons l on l.id = qa.lesson_id where qa.student_id = :studentId""");
+        queries.put("codeSubmissions", """
+                select l.title as lesson, c.language, c.code, c.passed, c.passed_tests as "passedTests",
+                       c.total_tests as "totalTests", c.created_at as "createdAt"
+                from code_submissions c join lessons l on l.id = c.lesson_id
+                where c.student_id = :studentId order by c.created_at""");
         queries.put("assignmentSubmissions", """
                 select s.file_name as "fileName", s.comment, s.status, s.score, s.feedback, s.submitted_at as "submittedAt"
                 from assignment_submissions s where s.student_id = :studentId""");

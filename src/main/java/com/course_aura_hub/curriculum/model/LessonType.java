@@ -7,7 +7,9 @@ import java.util.Locale;
 public enum LessonType {
     VIDEO,
     ARTICLE,
-    QUIZ;
+    QUIZ,
+    // A coding exercise, completed by passing its tests
+    CODE;
 
     public static LessonType fromValue(String value) {
         if (value == null || value.isBlank()) {

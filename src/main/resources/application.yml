@@ -92,6 +92,13 @@ jwt:
   refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000}
 
 app:
+  coding:
+    # Coding exercises run learners' code on a Judge0 CE server, never on this one. Empty URL turns running off.
+    judge0-url: ${CODING_JUDGE0_URL:}
+    auth-header: ${CODING_JUDGE0_AUTH_HEADER:X-Auth-Token}
+    auth-token: ${CODING_JUDGE0_AUTH_TOKEN:}
+    runs-per-minute: ${CODING_RUNS_PER_MINUTE:10}
+
   payment:
     # Payment gateway id. Empty disables paid checkout; "fake" is for development only.
     provider: ${PAYMENT_PROVIDER:}
