@@ -204,6 +204,15 @@ app:
     refresh-token-max-age: ${COOKIE_REFRESH_TOKEN_MAX_AGE:604800}
     http-only: ${COOKIE_HTTP_ONLY:true}
 
+  assistant:
+    # AI study assistant (Anthropic API). Empty key turns it off. Learner names and emails are never sent.
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: ${ASSISTANT_MODEL:claude-opus-5-5}
+    # Effort for answers: low suits chat; raise it for deeper answers at more cost
+    chat-effort: ${ASSISTANT_CHAT_EFFORT:low}
+    daily-token-limit: ${ASSISTANT_DAILY_TOKEN_LIMIT:100000}
+    requests-per-minute: ${ASSISTANT_REQUESTS_PER_MINUTE:6}
+
   notifications:
     # Streams close after this long; clients reconnect, which re-checks their session
     stream-timeout: ${NOTIFICATION_STREAM_TIMEOUT:15m}

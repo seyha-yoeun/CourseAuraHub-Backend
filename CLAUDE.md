@@ -43,6 +43,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `discussion` | Lesson questions and answers, staff inbox | `/api/v1/me/lessons/{id}/questions`, `/api/v1/me/questions`, `/api/v1/instructor/questions` |
 | `note` | Private lesson notes and video bookmarks | `/api/v1/me/lessons/{id}/notes`, `/api/v1/me/notes` |
 | `category` | Managed course categories | `/api/v1/categories` (public), `/api/v1/admin/categories` |
+| `assistant` | AI study assistant (Anthropic API, off without a key): streamed answers from a lesson's study text, summaries, quiz drafts | `/api/v1/me/lessons/{id}/assistant/messages` (SSE), `/api/v1/me/lessons/{id}/summary`, `/api/v1/instructor/lessons/{id}/assistant-source`, `/api/v1/instructor/lessons/{id}/quiz/draft` |
 | `assignment` | Assignments, submissions and grading | `/api/v1/me/lessons/{id}/assignment`, `/api/v1/instructor/lessons/{id}/assignment`, `/api/v1/instructor/submissions` |
 | `instructor` | An instructor's own courses, and the admin review that publishes them | `/api/v1/instructor`, `/api/v1/admin/course-reviews` |
 | `reminder` | Nudges to return to an unfinished course | `/api/v1/me/reminders` |
@@ -75,6 +76,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Telegram**: `TelegramNotifier` listens to `NotificationsCreated`, so anything sent through `NotificationService` reaches connected chats without extra code. Bot replies must only use the account connected to the chat, and every dynamic value must go through `TelegramMessages.escape`. The bot token is part of Telegram URLs, so never log a Telegram client exception's cause.
 - **Never expose learner PII** (email, total spent) to non-admins. The `enrolledStudentList` field on course detail is admin-only.
 - **Migrations**: check the highest `V####` in `src/main/resources/db/migration/` before adding one. `V0013`, `V0017` and `V0036` seed sample data. Flyway runs each once, so add new seed data in a new migration and never edit an applied one.
+- **Study assistant**: only `ClaudeGateway` calls the Anthropic SDK, on the beta endpoint with server-side refusal fallbacks (`fallbacksDefault()`), and never inside a transaction. The system prompt holds the lesson's whole study text (`lesson_ai_sources`) and is prompt-cached, so keep it stable per lesson; it must never contain learner names, emails or quiz answers. Answers stream on the service's own executor; usage counts toward `app.assistant.daily-token-limit`.
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
 
 - **Course access**: decide who manages a course with `CourseAccess` (`@courseAccess` in `@PreAuthorize`), not `isAdmin`: instructors manage only courses with their `owner_id`. Courses without an owner are admin-managed. Only admin approval publishes an instructor's course, so never let the instructor routes set a status. Instructors must never see learner emails or spending.
