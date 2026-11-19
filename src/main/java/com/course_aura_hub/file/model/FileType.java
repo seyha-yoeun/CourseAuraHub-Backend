@@ -12,7 +12,9 @@ public enum FileType {
     WEBP("image/webp", "webp"),
     MP4("video/mp4", "mp4"),
     WEBM("video/webm", "webm"),
-    PDF("application/pdf", "pdf");
+    PDF("application/pdf", "pdf"),
+    // Captions for video lessons
+    VTT("text/vtt", "vtt");
 
     /** How many leading bytes {@link #matches} needs. */
     public static final int SIGNATURE_LENGTH = 12;
@@ -42,6 +44,9 @@ public enum FileType {
             case MP4 -> startsWith(start, 4, ascii("ftyp"));
             case WEBM -> startsWith(start, 0, WEBM_START);
             case PDF -> startsWith(start, 0, ascii("%PDF-"));
+            // A WebVTT file starts with WEBVTT, optionally after a UTF-8 byte-order mark
+            case VTT -> startsWith(start, 0, ascii("WEBVTT")) || startsWith(start, 3, ascii("WEBVTT"))
+                    && startsWith(start, 0, new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         };
     }
 

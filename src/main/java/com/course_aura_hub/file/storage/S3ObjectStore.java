@@ -5,6 +5,8 @@ import com.course_aura_hub.file.config.StorageProperties;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.exception.SdkException;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
@@ -14,6 +16,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -100,6 +103,26 @@ public class S3ObjectStore implements ObjectStore, AutoCloseable {
                 .destinationBucket(bucket)
                 .destinationKey(toKey)));
         delete(fromKey);
+    }
+
+    @Override
+    public byte[] read(String key, int maxBytes) {
+        long size = size(key).orElseThrow(() -> new ServiceUnavailableException("File not found in storage"));
+        if (size > maxBytes) {
+            throw new ServiceUnavailableException("File is too large to read");
+        }
+        return call(() -> client.getObjectAsBytes(request -> request.bucket(bucket).key(key)).asByteArray());
+    }
+
+    @Override
+    public void download(String key, Path target) {
+        call(() -> client.getObject(request -> request.bucket(bucket).key(key), ResponseTransformer.toFile(target)));
+    }
+
+    @Override
+    public void upload(String key, Path source, String contentType) {
+        call(() -> client.putObject(request -> request.bucket(bucket).key(key).contentType(contentType),
+                RequestBody.fromFile(source)));
     }
 
     @Override
