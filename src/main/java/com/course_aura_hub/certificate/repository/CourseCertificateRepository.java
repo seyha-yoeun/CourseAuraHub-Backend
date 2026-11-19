@@ -20,6 +20,8 @@ public interface CourseCertificateRepository extends JpaRepository<CourseCertifi
     @EntityGraph(attributePaths = {"student", "course"})
     Optional<CourseCertificate> findByCertificateNumber(String certificateNumber);
 
+    boolean existsByCourseId(Integer courseId);
+
     boolean existsByStudentIdAndCourseId(Integer studentId, Integer courseId);
 
     Optional<CourseCertificate> findByStudentIdAndCourseId(Integer studentId, Integer courseId);

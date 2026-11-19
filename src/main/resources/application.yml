@@ -113,6 +113,15 @@ app:
   certificates:
     # Frontend verification page. Printed on certificates, so it must be the public production URL.
     verify-url: ${CERTIFICATE_VERIFY_URL:http://localhost:3000/certificates}
+    sharing:
+      # Public URL of this API (ending in /api/v1). Open Badges documents link to each other with it.
+      api-base-url: ${CERTIFICATE_BADGE_API_URL:http://localhost:8080/api/v1}
+      site-url: ${CERTIFICATE_SITE_URL:http://localhost:3000}
+      # Badge image for courses without a thumbnail
+      badge-image-url: ${CERTIFICATE_BADGE_IMAGE_URL:http://localhost:3000/badge.png}
+      issuer-email: ${CERTIFICATE_ISSUER_EMAIL:}
+      # LinkedIn company id, so the certificate shows the platform's logo; blank uses the platform name
+      linkedin-organization-id: ${CERTIFICATE_LINKEDIN_ORGANIZATION_ID:}
 
   reports:
     # When the weekly report goes out, if it is switched on in Settings. Default: Mondays at 08:00, server time.

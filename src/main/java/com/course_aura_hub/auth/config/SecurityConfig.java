@@ -107,6 +107,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/me", "/api/v1/me/**").authenticated()
                         // Public certificate verification (numbers are unguessable; no contact details exposed)
                         .requestMatchers(HttpMethod.GET, "/api/v1/certificates/*").permitAll()
+                        // Open Badges documents, fetched by badge wallets and validators
+                        .requestMatchers(HttpMethod.GET, "/api/v1/certificates/*/badge.json", "/api/v1/badges/**").permitAll()
                         // Published learning paths are part of the public catalog
                         .requestMatchers(HttpMethod.GET, "/api/v1/learning-paths", "/api/v1/learning-paths/*").permitAll()
                         // Payment provider webhooks, authenticated by signature in the gateway
