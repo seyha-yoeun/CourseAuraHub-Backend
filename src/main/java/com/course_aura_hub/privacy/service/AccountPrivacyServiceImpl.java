@@ -140,6 +140,11 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                            status = 'INACTIVE', reminders_enabled = false
                     where id = :studentId
                     """, params.addValue("studentEmail", "deleted-student-" + studentId + "@deleted.invalid"));
+            // Nothing renews for a deleted account; payments stay as money records
+            jdbc.update("""
+                    update subscriptions set status = 'CANCELLED', cancelled_at = now()
+                    where student_id = :studentId and status in ('PENDING', 'ACTIVE', 'PAST_DUE')
+                    """, params);
         }
 
         refreshSessionService.revokeAllSessions(userId, SessionRevocationReason.ACCOUNT_DELETED);
@@ -185,6 +190,11 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         queries.put("courses", """
                 select c.slug, c.title, sc.completed from student_courses sc
                 join courses c on c.id = sc.course_id where sc.student_id = :studentId order by c.title""");
+        queries.put("subscriptionPayments", """
+                select p.payment_number as "paymentNumber", sp.name as plan, p.amount, p.currency, p.status,
+                       p.period_start as "periodStart", p.period_end as "periodEnd", p.paid_at as "paidAt"
+                from subscription_payments p join subscriptions s on s.id = p.subscription_id
+                join subscription_plans sp on sp.id = s.plan_id where s.student_id = :studentId order by p.created_at""");
         queries.put("enrollments", """
                 select c.slug, e.enrolled_at as "enrolledAt", e.amount from enrollments e
                 join courses c on c.id = e.course_id where e.student_id = :studentId order by e.enrolled_at""");
