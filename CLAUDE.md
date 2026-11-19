@@ -41,6 +41,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `quiz` | Graded quizzes for QUIZ lessons | `/api/v1/me/lessons/{id}/quiz`, `/api/v1/admin/lessons/{id}/quiz` (ADMIN) |
 | `coding` | CODE lessons with coding exercises, run in a Judge0 sandbox and graded against hidden tests | `/api/v1/instructor/lessons/{id}/exercise`, `/api/v1/me/lessons/{id}/exercise`, `/api/v1/me/lessons/{id}/exercise/runs` |
 | `review` | Course reviews and ratings | `/api/v1/courses/{slug}/reviews`, `/api/v1/me/courses/{slug}/review` |
+| `learner` (leaderboards) | XP leaderboards and weekly lesson goals | `/api/v1/leaderboard`, `/api/v1/me/goals` |
 | `discussion` | Lesson questions and answers, staff inbox | `/api/v1/me/lessons/{id}/questions`, `/api/v1/me/questions`, `/api/v1/instructor/questions` |
 | `note` | Private lesson notes and video bookmarks | `/api/v1/me/lessons/{id}/notes`, `/api/v1/me/notes` |
 | `category` | Managed course categories | `/api/v1/categories` (public), `/api/v1/admin/categories` |
@@ -64,6 +65,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
   - `students.total_spent`
   - Reuse `EnrollmentService.create/delete` instead of re-implementing enrollment side effects.
 - **Certificates are permanent**: issue them through `CertificateService` wherever `student_courses.completed` can flip to true (lesson completion and curriculum edits). They are never revoked when a course re-opens. Name, title and instructor are copied onto the row at issue, so read those columns, not `student` or `course`. PDFs (`CertificatePdfRenderer`) shape Khmer with Java2D and draw it as outlines (`CertificateTextOutliner`), because PDFBox can't shape it. That needs fontconfig and freetype in the image. Other scripts missing from the fonts, such as Chinese, get a clear error and print the web page instead.
+- **Leaderboard XP is derived, not stored** (`LeaderboardServiceImpl`): 10 per lesson, 20 per quiz passed, 100 per certificate, since Monday or the 1st (UTC). Rankings are cached in memory for a minute per instance. Entries show only a shortened name and avatar; learners can hide through `learner_goals.leaderboard_visible`.
 - **Achievements and streaks are derived, not stored** (`LearnerStatsService`, `Achievement` enum). Streak days come from `lesson_progress.completed_at` in the caller's `timeZone`, so un-completing a lesson also removes that day's activity.
 - **Payments**: enrollment for paid courses happens only in `OrderService.applyPaymentEvent`, after the gateway verifies the webhook. Keep provider calls outside transactions (`CheckoutFacade`). The `fake` gateway lets anyone with the webhook secret mark orders paid; never enable it in production.
 - **Sale prices**: `courses.price` is always the regular price and a sale is never written to it. Use `Course.currentPrice()` for anything a learner sees or pays. Admin course responses keep the regular price, because the edit form saves it back. Catalog sorting by price uses the regular price.
