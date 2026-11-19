@@ -125,6 +125,13 @@
 			<artifactId>jackson-databind</artifactId>
 		</dependency>
 
+		<!-- Anthropic Java SDK: the AI study assistant (off until ANTHROPIC_API_KEY is set) -->
+		<dependency>
+			<groupId>com.anthropic</groupId>
+			<artifactId>anthropic-java</artifactId>
+			<version>3.10.0</version>
+		</dependency>
+
 		<!-- Springdoc OpenAPI 2.x (Swagger UI) -->
 		<dependency>
 			<groupId>org.springdoc</groupId>

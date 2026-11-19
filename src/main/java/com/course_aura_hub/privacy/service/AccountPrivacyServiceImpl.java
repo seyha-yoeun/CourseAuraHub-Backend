@@ -150,6 +150,9 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         user.setEnabled(false);
         user.setTokenVersion(user.getTokenVersion() + 1);
         userRepository.save(user);
+        // Questions to the study assistant are the learner's own words
+        jdbc.update("delete from assistant_conversations where student_id = :studentId", params);
+        jdbc.update("delete from assistant_usage where student_id = :studentId", params);
 
         // The audit row keeps the user id only, so the old address is not kept here either
         auditService.record(AuthAuditEntry.builder()
@@ -194,6 +197,10 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         queries.put("reviews", """
                 select c.slug, r.rating, r.comment, r.created_at as "createdAt" from course_reviews r
                 join courses c on c.id = r.course_id where r.student_id = :studentId""");
+        queries.put("assistantMessages", """
+                select l.title as lesson, m.role, m.content, m.created_at as "createdAt"
+                from assistant_messages m join assistant_conversations c on c.id = m.conversation_id
+                join lessons l on l.id = c.lesson_id where c.student_id = :studentId order by m.id""");
         queries.put("notes", """
                 select l.title as lesson, n.body, n.position_seconds as "positionSeconds", n.created_at as "createdAt"
                 from lesson_notes n join lessons l on l.id = n.lesson_id where n.student_id = :studentId""");
