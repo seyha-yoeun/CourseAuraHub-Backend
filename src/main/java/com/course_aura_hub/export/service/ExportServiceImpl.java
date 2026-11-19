@@ -120,6 +120,21 @@ public class ExportServiceImpl implements ExportService {
     }
 
     @Override
+    public void payouts(Writer out, LocalDate from, LocalDate to) {
+        CsvWriter csv = new CsvWriter(out).row("payout_id", "created_at", "status", "instructor_name", "instructor_email",
+                "amount", "currency", "method", "earnings", "reviewed_at", "paid_at", "payment_reference");
+        stream("""
+                select p.id, p.created_at, p.status, trim(u.first_name || ' ' || u.last_name), u.email, p.amount,
+                       p.currency, p.method, (select count(*) from instructor_earnings e where e.payout_id = p.id),
+                       p.reviewed_at, p.paid_at, p.payment_reference
+                from payout_requests p
+                join users u on u.id = p.instructor_id
+                where p.created_at >= ? and p.created_at < ?
+                order by p.created_at, p.id
+                """, csv, 12, start(from), end(to));
+    }
+
+    @Override
     public void courseLearners(Writer out, Actor actor, String slug) {
         Course course = managed(actor, slug);
         CsvWriter csv = new CsvWriter(out).row("learner_name", "enrolled_at", "completed_lessons", "total_lessons",

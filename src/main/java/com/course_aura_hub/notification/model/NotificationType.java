@@ -13,6 +13,7 @@ public enum NotificationType {
     NEW_ENROLLMENT,
     COURSE_COMPLETED,
     MEMBER_CARD,
+    PAYOUT,
     LESSON_QUESTION,
     ASSIGNMENT,
     COURSE_REVIEW,

@@ -24,6 +24,9 @@ public interface ExportService {
 
     void auditLog(Writer out, LocalDate from, LocalDate to);
 
+    /** Instructor payout requests with the instructor's own contact details. */
+    void payouts(Writer out, LocalDate from, LocalDate to);
+
     /** A course's learners and their progress, for its managers: names only. */
     void courseLearners(Writer out, Actor actor, String slug);
 

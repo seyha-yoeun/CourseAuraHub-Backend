@@ -109,6 +109,13 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                     + ". Spend it or ask support to close the card before deleting your account.");
         }
 
+        Integer openPayouts = jdbc.queryForObject("""
+                select count(*) from payout_requests
+                where instructor_id = :userId and status in ('REQUESTED', 'APPROVED')""", params, Integer.class);
+        if (openPayouts != null && openPayouts > 0) {
+            throw new BusinessRuleException("You have a payout in progress. Wait until it is paid or declined.");
+        }
+
         // Sign-in methods and secrets
         for (String table : List.of("user_oauth_identities", "user_totp_credentials", "mfa_recovery_codes",
                 "auth_one_time_tokens", "telegram_links", "notifications")) {
@@ -125,6 +132,8 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         jdbc.update("update lesson_answers set author_id = null, author_name = :name where author_id = :userId", params);
         jdbc.update("update course_certificates set learner_name = :name where student_id = :studentId", params);
         jdbc.update("update member_cards set holder_name = :name where student_id = :studentId", params);
+        // Payouts stay as money records, without where the money went
+        jdbc.update("update payout_requests set account_details = '', note = null where instructor_id = :userId", params);
         if (studentId != null) {
             jdbc.update("""
                     update students set name = :name, email = :studentEmail, avatar = '', country = '',
@@ -207,6 +216,10 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         queries.put("memberCardTransactions", """
                 select t.type, t.amount, t.created_at as "createdAt" from member_card_transactions t
                 join member_cards m on m.id = t.card_id where m.student_id = :studentId order by t.created_at""");
+        queries.put("payouts", """
+                select p.amount, p.currency, p.method, p.account_details as "accountDetails", p.status,
+                       p.created_at as "createdAt", p.paid_at as "paidAt"
+                from payout_requests p where p.instructor_id = :userId order by p.created_at""");
         queries.put("signInProviders", """
                 select provider, email, created_at as "linkedAt", last_login_at as "lastLoginAt"
                 from user_oauth_identities where user_id = :userId""");
