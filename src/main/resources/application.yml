@@ -144,6 +144,13 @@ app:
     # When the weekly report goes out, if it is switched on in Settings. Default: Mondays at 08:00, server time.
     weekly-cron: ${WEEKLY_REPORT_CRON:0 0 8 * * MON}
 
+  live:
+    # Learners can join a live session this many minutes before it starts
+    join-early-minutes: ${LIVE_JOIN_EARLY_MINUTES:15}
+    # Public URLs: this API (for calendar feed links) and the web app (linked from calendar events)
+    api-base-url: ${LIVE_API_BASE_URL:http://localhost:8080/api/v1}
+    site-url: ${LIVE_SITE_URL:http://localhost:3000}
+
   reminders:
     enabled: ${REMINDERS_ENABLED:true}
     # Daily at 09:00, server time

@@ -49,6 +49,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 | `category` | Managed course categories | `/api/v1/categories` (public), `/api/v1/admin/categories` |
 | `assistant` | AI study assistant (Anthropic API, off without a key): streamed answers from a lesson's study text, summaries, quiz drafts | `/api/v1/me/lessons/{id}/assistant/messages` (SSE), `/api/v1/me/lessons/{id}/summary`, `/api/v1/instructor/lessons/{id}/assistant-source`, `/api/v1/instructor/lessons/{id}/quiz/draft` |
 | `assignment` | Assignments, submissions and grading | `/api/v1/me/lessons/{id}/assignment`, `/api/v1/instructor/lessons/{id}/assignment`, `/api/v1/instructor/submissions` |
+| `live` | Scheduled live classes, join-to-get-link attendance, reminders and a private ICS calendar feed | `/api/v1/instructor/courses/{slug}/live-sessions`, `/api/v1/me/live-sessions`, `/api/v1/me/calendar-token`, `/api/v1/calendar/{token}.ics` (public) |
 | `instructor` | An instructor's own courses, and the admin review that publishes them | `/api/v1/instructor`, `/api/v1/admin/course-reviews` |
 | `survey` | One feedback survey per course with a built-in NPS question; learners are asked once at half way or completion | `/api/v1/instructor/courses/{slug}/survey`, `/api/v1/me/courses/{slug}/survey` |
 | `reminder` | Nudges to return to an unfinished course | `/api/v1/me/reminders` |
@@ -89,6 +90,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Tests**: `IntegrationTestBase` is shared by every module but lives in `src/test/java/com/course_aura_hub/auth/`. It turns rate limiting off.
 
 - **Course access**: decide who manages a course with `CourseAccess` (`@courseAccess` in `@PreAuthorize`), not `isAdmin`: instructors manage only courses with their `owner_id`. Courses without an owner are admin-managed. Only admin approval publishes an instructor's course, so never let the instructor routes set a status. Instructors must never see learner emails or spending.
+- **Live sessions**: learners never get `meeting_url` from a listing, only from `join`, which records attendance; calendar events link to the app, not the meeting. Calendar feeds are public URLs authorised by a token stored only as a `TokenHasher` hash.
 - **Private file references**: any endpoint that stores a `storage://` value from a caller must call `FileService.requireOwned` first (`CourseAccess.requireUsableFile` for lessons). Stored references get signed links, so skipping this lets someone read another person's private file.
 - **Top-up requests**: a request moves no money. Approval credits the card through `MemberCardService.creditTopUp`, with `TOPUP-{id}` as the ledger reference.
 - **Lesson completion event**: `LessonProgressServiceImpl` publishes `LessonCompleted` (with done and total lessons) inside the completing transaction. Surveys listen to it and record each prompt in `survey_prompts`, so a learner is asked once. Survey results are aggregates only; never return a response with who gave it.
