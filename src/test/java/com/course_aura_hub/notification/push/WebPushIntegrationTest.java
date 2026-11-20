@@ -11,6 +11,7 @@ import java.security.interfaces.ECPublicKey;
 import java.util.List;
 import java.util.Map;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -82,7 +83,8 @@ class WebPushIntegrationTest extends LearnerIntegrationTestSupport {
         mockMvc.perform(asJson(user, post("/api/v1/me/push-subscriptions"),
                         subscription("https://fcm.googleapis.com/fcm/send/bad-key", WebPushCrypto.encode(new byte[65]))))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/v1/me/push-subscriptions")).andExpect(status().isUnauthorized());
+        // With a CSRF token, so the request reaches authentication instead of being refused by the CSRF filter
+        mockMvc.perform(post("/api/v1/me/push-subscriptions").with(csrf())).andExpect(status().isUnauthorized());
     }
 
     @Test
