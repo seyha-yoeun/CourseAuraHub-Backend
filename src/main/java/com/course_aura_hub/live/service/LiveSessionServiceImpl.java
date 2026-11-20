@@ -310,7 +310,7 @@ public class LiveSessionServiceImpl implements LiveSessionService {
     }
 
     private static String escape(String text) {
-        return text.replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,").replace("\r", "").replace("\n", "\\n");
+        return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\r", "").replace("\n", "\\n");
     }
 
     private static String readable(Instant instant) {
