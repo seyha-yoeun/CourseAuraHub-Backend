@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 
--- Run with: psql -U <user> -f database/courseaurahub.sql
+-- Run with: psql -U <user> -f infrastructure/database/courseaurahub.sql
 SELECT format('CREATE DATABASE %I', 'courseaurahub')
 WHERE NOT EXISTS (
   SELECT 1 FROM pg_database WHERE datname = 'courseaurahub'

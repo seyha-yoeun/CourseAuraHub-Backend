@@ -52,7 +52,8 @@ cp .env.example .env
 #    then set JWT_SECRET, plus OAuth client IDs if you want social login
 
 # 2. Start PostgreSQL (port 5432), pgAdmin (port 5050), Mailpit (port 8025) and MinIO (API 9000, console 9001)
-docker compose up -d
+#    Compose files live in infrastructure/; --env-file passes the root .env, which Compose would otherwise not read
+docker compose -f infrastructure/docker-compose.yaml --env-file .env up -d
 
 # 3. Run the API on http://localhost:8080
 ./mvnw spring-boot:run
@@ -80,14 +81,14 @@ Flyway creates the schema and seeds sample data on first start: about a year of 
 **Useful URLs**
 - Swagger UI: http://localhost:8080/swagger-ui.html
 - pgAdmin: http://localhost:5050
-- Postman collection: [`postman/`](postman/README.md)
+- Postman collection: [`infrastructure/postman/`](infrastructure/postman/README.md)
 
 ## Logs
 
 The backend writes JSON logs to `logs/course-aura-hub.log`. To search them in Grafana at http://localhost:3001:
 
 ```bash
-docker compose --profile logging up -d
+docker compose -f infrastructure/docker-compose.yaml --env-file .env --profile logging up -d
 ```
 
 See [docs/logging.md](docs/logging.md) for ports, queries, retention and troubleshooting.

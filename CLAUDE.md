@@ -9,7 +9,7 @@
 Run build, test, or git commands only when the user asks (see `AGENTS.md`).
 
 ```bash
-docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
+docker compose -f infrastructure/docker-compose.yaml --env-file .env up -d   # Postgres 16 (5432) + pgAdmin (5050)
 ./mvnw spring-boot:run                # run the API
 ./mvnw test                           # all tests (needs Docker for Testcontainers)
 ./mvnw test -Dtest=ClassName          # one test class
@@ -100,7 +100,7 @@ docker compose up -d                  # Postgres 16 (5432) + pgAdmin (5050)
 - **Instructor earnings** come from `OrderPaid` and `OrderRefunded`, which `OrderServiceImpl` publishes inside the payment and refund transactions; `EarningServiceImpl` listens to them. Only courses with an `owner_id` earn. A refund before the money is claimed reverses the sale; after that it adds a negative `REFUND` row that comes off the next payout, so never edit a claimed or paid earning. A payout claims every available row under a row lock, and only one payout per instructor can be open.
 - **Account deletion** (`AccountPrivacyServiceImpl`) anonymizes instead of deleting rows: orders, member card ledgers and certificates are kept under "Deleted learner". When you add a table holding personal data, add it to both the export queries and the deletion steps.
 - **Catalog events** (`POST /api/v1/events`) are public, CSRF-exempt and not audited. They store only an HMAC of the user id, the browser's random id or the address (`app.analytics.visitor-salt`), never the raw value, and are rate-limited per address in `CatalogAnalyticsServiceImpl`.
-- **Logging**: the console stays human-readable; `logs/course-aura-hub.log` is Logstash JSON and Alloy ships it to Loki (`docs/logging.md`). `RequestLoggingFilter` logs method, path, status and duration and sets the `requestId` MDC value. Never add query strings, headers, cookies or bodies to it. `docker compose down -v` also deletes Postgres data.
+- **Logging**: the console stays human-readable; `logs/course-aura-hub.log` is Logstash JSON and Alloy ships it to Loki (`docs/logging.md`). `RequestLoggingFilter` logs method, path, status and duration and sets the `requestId` MDC value. Never add query strings, headers, cookies or bodies to it. `docker compose -f infrastructure/docker-compose.yaml down -v` also deletes Postgres data.
 
 ## Roadmap (not yet built)
 
