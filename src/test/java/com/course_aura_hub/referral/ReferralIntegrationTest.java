@@ -123,7 +123,7 @@ class ReferralIntegrationTest extends LearnerIntegrationTestSupport {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String orderNumber = JsonPath.read(body, "$.data.orderNumber");
-        String price = courseRepository.findBySlug(PAID_COURSE).map(Course::currentPrice).orElseThrow().price().toPlainString();
+        String price = courseRepository.findBySlug(PAID_COURSE).map(Course::getPrice).orElseThrow().toPlainString();
         String payload = orderNumber + ":PAID:" + price + ":USD";
         mockMvc.perform(post("/api/v1/payments/webhooks/fake")
                         .contentType(MediaType.TEXT_PLAIN)
