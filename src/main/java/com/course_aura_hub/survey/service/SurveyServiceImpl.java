@@ -286,12 +286,14 @@ public class SurveyServiceImpl implements SurveyService {
         return course;
     }
 
+    /**
+     * Only looks the learner up: currentStudent would insert a student row on first use, which a read-only
+     * transaction (findForLearner) rejects. Someone without a learner record isn't enrolled anyway.
+     */
     private Student enrolled(String email, Course course) {
-        Student student = learnerAccountService.currentStudent(email);
-        if (studentCourseRepository.findByStudentIdAndCourseId(student.getId(), course.getId()).isEmpty()) {
-            throw new ForbiddenActionException("Enroll in this course to see its survey");
-        }
-        return student;
+        return learnerAccountService.findCurrentStudent(email)
+                .filter(student -> studentCourseRepository.findByStudentIdAndCourseId(student.getId(), course.getId()).isPresent())
+                .orElseThrow(() -> new ForbiddenActionException("Enroll in this course to see its survey"));
     }
 
     private CourseSurvey activeSurvey(Course course) {
