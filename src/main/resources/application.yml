@@ -152,6 +152,14 @@ app:
     repeat-days: ${REMINDER_REPEAT_DAYS:14}
     batch-size: ${REMINDER_BATCH_SIZE:500}
 
+  push:
+    # Browser push (Web Push with VAPID). Leave the keys empty to turn it off. Generate them once, for example with
+    # `npx web-push generate-vapid-keys`, and never change them: that invalidates every browser subscription.
+    vapid-public-key: ${PUSH_VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${PUSH_VAPID_PRIVATE_KEY:}
+    subject: ${PUSH_SUBJECT:mailto:admin@courseaurahub.local}
+    ttl-seconds: ${PUSH_TTL_SECONDS:86400}
+
   telegram:
     # Bot from @BotFather. A blank token turns Telegram off.
     bot-token: ${TELEGRAM_BOT_TOKEN:}

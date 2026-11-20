@@ -118,7 +118,8 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
 
         // Sign-in methods and secrets
         for (String table : List.of("user_oauth_identities", "user_totp_credentials", "mfa_recovery_codes",
-                "auth_one_time_tokens", "telegram_links", "notifications")) {
+                "auth_one_time_tokens", "telegram_links", "notifications", "push_subscriptions",
+                "push_muted_types")) {
             jdbc.update("delete from " + table + " where user_id = :userId", params);
         }
         // Learner extras that are not records of money or achievement
@@ -237,6 +238,9 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         queries.put("notes", """
                 select l.title as lesson, n.body, n.position_seconds as "positionSeconds", n.created_at as "createdAt"
                 from lesson_notes n join lessons l on l.id = n.lesson_id where n.student_id = :studentId""");
+        queries.put("pushDevices", """
+                select user_agent as "userAgent", created_at as "createdAt", last_success_at as "lastSuccessAt"
+                from push_subscriptions where user_id = :userId order by created_at""");
         queries.put("questions", """
                 select q.body, q.resolved, q.created_at as "createdAt" from lesson_questions q where q.author_id = :userId""");
         queries.put("answers", """
