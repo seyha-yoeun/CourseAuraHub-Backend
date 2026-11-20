@@ -28,6 +28,7 @@ import com.course_aura_hub.curriculum.model.LessonWatchPosition;
 import com.course_aura_hub.curriculum.repository.LessonWatchPositionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.course_aura_hub.assignment.model.Assignment;
@@ -62,6 +63,7 @@ public class LessonProgressServiceImpl implements LessonProgressService {
     private final AssignmentRepository assignmentRepository;
     private final AssignmentSubmissionRepository submissionRepository;
     private final LessonAvailability lessonAvailability;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -229,6 +231,9 @@ public class LessonProgressServiceImpl implements LessonProgressService {
             certificateService.issueIfAbsent(student.getId(), course.getId());
         }
         student.setLastActive(LocalDate.now());
+        if (lessonCompleted) {
+            eventPublisher.publishEvent(new LessonCompleted(student.getId(), course.getId(), done, total));
+        }
 
         return new LessonProgressResponse(
                 lessonId,
