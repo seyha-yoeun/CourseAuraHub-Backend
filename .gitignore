@@ -40,4 +40,4 @@ build/
 /logs/
 
 ### MinIO: uploaded files and license ###
-/minio/
+/infrastructure/minio/

@@ -50,6 +50,6 @@ The OAuth2 requests only verify the initial `302` redirect from the API. Complet
 Run the collection from the command line:
 
 ```bash
-newman run postman/CourseAuraHub-Auth.postman_collection.json \
-  -e postman/CourseAuraHub-Local.postman_environment.json
+newman run infrastructure/postman/CourseAuraHub-Auth.postman_collection.json \
+  -e infrastructure/postman/CourseAuraHub-Local.postman_environment.json
 ```

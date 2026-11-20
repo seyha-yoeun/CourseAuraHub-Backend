@@ -1,3 +1,7 @@
+# Run from the backend root: docker compose -f infrastructure/docker-compose.yaml --env-file .env up -d
+# The name keeps the volumes (postgres_data, ...) this project had before the file moved here.
+name: course-aura-hub-backend
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -112,7 +116,7 @@ services:
     mem_limit: 256m
     volumes:
       - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
-      - ./logs:/var/log/course-aura-hub:ro
+      - ../logs:/var/log/course-aura-hub:ro
       - alloy_data:/var/lib/alloy/data
     depends_on:
       - loki
