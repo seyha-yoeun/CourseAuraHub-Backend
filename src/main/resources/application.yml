@@ -163,6 +163,14 @@ app:
     # Frontend origin that notification links open in
     app-url: ${TELEGRAM_APP_URL:http://localhost:3000}
 
+  analytics:
+    # Anonymous catalog events (view, add to cart, checkout start) for the admin funnel
+    enabled: ${CATALOG_ANALYTICS_ENABLED:true}
+    # Secret mixed into visitor hashes; set your own in production
+    visitor-salt: ${CATALOG_ANALYTICS_SALT:dev-only-change-me}
+    retention-days: ${CATALOG_ANALYTICS_RETENTION_DAYS:400}
+    per-minute: ${CATALOG_ANALYTICS_PER_MINUTE:60}
+
   course-revisions:
     # Fields an instructor may change on a live course without admin review; anything else waits as a revision
     immediate-fields: ${COURSE_REVISION_IMMEDIATE_FIELDS:tags,thumbnail}

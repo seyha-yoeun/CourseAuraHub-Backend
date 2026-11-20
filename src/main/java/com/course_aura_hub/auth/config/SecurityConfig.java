@@ -87,6 +87,8 @@ public class SecurityConfig {
                         .ignoringRequestMatchers("/api/v1/payments/webhooks/*", "/api/v1/telegram/webhook")
                         // Mail clients' one-click unsubscribe; authorised by the signed token in the link
                         .ignoringRequestMatchers("/api/v1/notifications/unsubscribe")
+                        // Anonymous catalog analytics, sent with navigator.sendBeacon; it changes nothing a user owns
+                        .ignoringRequestMatchers("/api/v1/events")
                         .ignoringRequestMatchers(bearerOnlyRequest())
                 )
                 .cors(Customizer.withDefaults())
@@ -115,6 +117,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhooks/*").permitAll()
                         // Telegram webhook, authenticated by its secret header in the controller
                         .requestMatchers(HttpMethod.POST, "/api/v1/telegram/webhook").permitAll()
+                        // Anonymous catalog events for the admin funnel; rate-limited in the service
+                        .requestMatchers(HttpMethod.POST, "/api/v1/events").permitAll()
                         // Email unsubscribe links work without signing in
                         .requestMatchers("/api/v1/notifications/unsubscribe").permitAll()
                         // Instructor workspace; each course is checked against its owner in the service
