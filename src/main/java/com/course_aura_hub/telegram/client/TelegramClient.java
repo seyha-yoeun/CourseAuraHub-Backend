@@ -26,6 +26,8 @@ public class TelegramClient {
 
     private static final String API = "https://api.telegram.org/bot{token}/{method}";
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    // The bot reads only messages; polling and the webhook ask for the same kinds
+    private static final List<String> UPDATE_TYPES = List.of("message");
 
     private final TelegramProperties properties;
     private final RestClient restClient;
@@ -52,13 +54,32 @@ public class TelegramClient {
         post("sendMessage", body, Void.class);
     }
 
+    /**
+     * Updates from {@code offset} on, without waiting. Asking with an offset also confirms every earlier update,
+     * so Telegram stops sending it.
+     */
     public List<TelegramUpdate> getUpdates(long offset) {
-        UpdatesResponse response = post("getUpdates", Map.of("offset", offset, "timeout", 0), UpdatesResponse.class);
+        UpdatesResponse response = post("getUpdates",
+                Map.of("offset", offset, "timeout", 0, "allowed_updates", UPDATE_TYPES), UpdatesResponse.class);
         return response == null || response.result() == null ? List.of() : response.result();
     }
 
+    /**
+     * Confirms every update before {@code offset} now, instead of on the next poll, so a restart doesn't hand them
+     * out again. Any newer update in the reply is left unconfirmed and arrives with the next poll.
+     */
+    public void confirmUpdates(long offset) {
+        post("getUpdates", Map.of("offset", offset, "limit", 1, "timeout", 0, "allowed_updates", UPDATE_TYPES), Void.class);
+    }
+
+    /** The username of the bot the token belongs to, without {@code @}; null when Telegram doesn't say. */
+    public String getMe() {
+        MeResponse response = post("getMe", Map.of(), MeResponse.class);
+        return response == null || response.result() == null ? null : response.result().username();
+    }
+
     public void setWebhook(String url, String secret) {
-        post("setWebhook", Map.of("url", url, "secret_token", secret, "allowed_updates", List.of("message")), Void.class);
+        post("setWebhook", Map.of("url", url, "secret_token", secret, "allowed_updates", UPDATE_TYPES), Void.class);
     }
 
     public void deleteWebhook() {
@@ -81,7 +102,7 @@ public class TelegramClient {
     }
 
     private TelegramException failure(String method, HttpStatusCode status) {
-        return new TelegramException(method + " returned " + status.value(), status.value() == 403);
+        return new TelegramException(method + " returned " + status.value(), status.value() == 403, status.value());
     }
 
     public record Button(String text, String url) {
@@ -89,5 +110,13 @@ public class TelegramClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record UpdatesResponse(List<TelegramUpdate> result) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record MeResponse(Bot result) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record Bot(String username) {
     }
 }

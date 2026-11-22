@@ -24,7 +24,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @TestPropertySource(properties = {
         "app.payment.provider=fake",
-        "app.payment.webhook-secret=test-webhook-secret"
+        "app.payment.webhook-secret=test-webhook-secret",
+        // 32 zero bytes: lets admins reveal issued codes in these tests
+        "app.access-codes.encryption-key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 })
 class GiftIntegrationTest extends LearnerIntegrationTestSupport {
 
@@ -120,6 +122,30 @@ class GiftIntegrationTest extends LearnerIntegrationTestSupport {
                 .andExpect(status().isForbidden());
         mockMvc.perform(asJson(learner, post("/api/v1/me/access-codes/redeem"), Map.of("code", "not a code")))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void adminsCanRevealTheFullCodesTheyIssued_andLearnersCannot() throws Exception {
+        TestUser admin = registerAdmin();
+        String body = mockMvc.perform(asJson(admin, post("/api/v1/admin/access-codes"),
+                        Map.of("courseSlug", PAID_COURSE, "quantity", 1, "batch", "reveal-" + System.nanoTime())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String code = JsonPath.<List<String>>read(body, "$.data.codes").get(0);
+        String batch = JsonPath.read(body, "$.data.batch");
+
+        String list = mockMvc.perform(as(admin, get("/api/v1/admin/access-codes").param("batch", batch)))
+                .andExpect(jsonPath("$.data[0].revealable").value(true))
+                .andReturn().getResponse().getContentAsString();
+        int id = JsonPath.read(list, "$.data[0].id");
+        assertThat(list).doesNotContain(code);
+
+        mockMvc.perform(as(admin, post("/api/v1/admin/access-codes/" + id + "/reveal")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.code").value(code));
+
+        mockMvc.perform(as(registerUser(), post("/api/v1/admin/access-codes/" + id + "/reveal")))
+                .andExpect(status().isForbidden());
     }
 
     private String gift(TestUser buyer, String recipient) throws Exception {

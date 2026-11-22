@@ -32,6 +32,7 @@ public class TelegramLinkServiceImpl implements TelegramLinkService {
     private final UserRepository userRepository;
     private final OneTimeTokenService oneTimeTokenService;
     private final TelegramProperties properties;
+    private final TelegramBotIdentity identity;
 
     @Override
     @Transactional(readOnly = true)
@@ -51,7 +52,7 @@ public class TelegramLinkServiceImpl implements TelegramLinkService {
                 .orElseThrow(() -> ResourceNotFoundException.of("User", userId));
         OneTimeTokenService.IssuedToken issued = oneTimeTokenService.issue(user, TokenPurpose.TELEGRAM_LINK, false);
         return new TelegramConnectLinkResponse(
-                "https://t.me/" + properties.botUsername() + "?start=" + issued.rawValue(),
+                "https://t.me/" + identity.username() + "?start=" + issued.rawValue(),
                 issued.token().getExpiresAt()
         );
     }

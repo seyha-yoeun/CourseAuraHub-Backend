@@ -16,7 +16,7 @@ docker compose -f infrastructure/docker-compose.yaml --env-file .env up -d   # P
 ```
 
 - Swagger UI: `/swagger-ui.html`
-- Demo data: set `DEMO_DATA_ENABLED=true` to import `src/main/resources/demo/demo-data.json` on startup.
+- Demo data: set `DEMO_DATA_ENABLED=true` to run `src/main/resources/demo/seed.sql` once on a local database (`config/DemoDataSeeder`). It empties every table first, then fills all of them.
 - Config: `src/main/resources/application.yml` only (no Spring profiles). Secrets come from env vars; `.env.example` lists them. Never read `.env`.
 
 ## Module Map (`src/main/java/com/course_aura_hub/`)

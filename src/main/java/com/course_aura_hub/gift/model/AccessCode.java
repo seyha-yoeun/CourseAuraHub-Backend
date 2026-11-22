@@ -20,7 +20,10 @@ import lombok.Setter;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A code that gives free access to one course. Only its hash and last characters are stored. */
+/**
+ * A code that gives free access to one course. Redemption looks it up by hash. Admin-issued codes also keep an
+ * encrypted copy (see AccessCodeCipher) so admins can see the full code again; gift codes never do.
+ */
 @Entity
 @Table(name = "access_codes")
 @Getter
@@ -37,6 +40,10 @@ public class AccessCode {
 
     @Column(name = "code_hash", nullable = false, unique = true, columnDefinition = "text")
     private String codeHash;
+
+    /** The full code, AES-GCM encrypted; null for gift codes and for codes issued before it was kept. */
+    @Column(name = "code_ciphertext", columnDefinition = "text")
+    private String codeCiphertext;
 
     /** The last four characters, so people can tell codes apart. */
     @Column(name = "code_hint", nullable = false, columnDefinition = "text")

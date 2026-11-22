@@ -34,6 +34,11 @@ loki.process "backend" {
     expression = "(eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)"
     replace    = "[REDACTED]"
   }
+  // Some lines name the user's email; Grafana shows only its domain (***@example.com). The file keeps it.
+  stage.replace {
+    expression = "([A-Za-z0-9._%+-]+)@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}"
+    replace    = "***"
+  }
 
   stage.json {
     expressions = {

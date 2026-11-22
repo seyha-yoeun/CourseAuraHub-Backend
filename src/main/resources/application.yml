@@ -203,6 +203,11 @@ app:
     # Frontend page that accepts an organization invitation; the token is appended as ?token=
     invite-url: ${ORGANIZATION_INVITE_URL:http://localhost:3000/organizations/join}
 
+  access-codes:
+    # Base64 32-byte AES key (`openssl rand -base64 32`) that lets admins reveal the full codes they issue.
+    # Falls back to MFA_ENCRYPTION_KEY. Empty: new codes are hash-only and cannot be revealed again.
+    encryption-key: ${ACCESS_CODE_ENCRYPTION_KEY:${MFA_ENCRYPTION_KEY:}}
+
   refunds:
     # Learners ask for refunds in the app. Inside the window and below the progress limit they're refunded at once.
     enabled: ${REFUNDS_ENABLED:true}
@@ -220,12 +225,12 @@ app:
     release-cron: ${PAYOUT_RELEASE_CRON:0 15 * * * *}
 
   demo-data:
-    # Opt-in demo data: the bundled mock catalog, then the full-lifecycle seed (demo/lifecycle-seed.sql) with
-    # accounts for every role. Never overwrites existing rows and only runs once.
+    # Opt-in local demo data (demo/seed.sql): on its first run it EMPTIES EVERY TABLE, then fills all of them,
+    # with accounts for every role. Runs once per database and only against the hosts below. Never in production.
     enabled: ${DEMO_DATA_ENABLED:false}
-    file: ${DEMO_DATA_FILE:demo/demo-data.json}
-    # Sign-in password of every lifecycle demo account (admin@demo.courseaurahub.io and others). Local use only.
+    # Sign-in password of every demo account (admin@demo.courseaurahub.io and others)
     password: ${DEMO_PASSWORD:Demo@2026!}
+    local-hosts: ${DEMO_DATA_LOCAL_HOSTS:localhost,127.0.0.1,[::1],host.docker.internal}
 
   oauth2:
     # URL to redirect the user after OAuth2 login succeeds (clean redirect, tokens in cookies)
@@ -346,6 +351,8 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
     try-it-out-enabled: true
+    # The API is split into User, Lecturer and Admin groups (SwaggerConfig); this one opens first
+    urls-primary-name: user
 
 # Bind-parameter tracing (org.hibernate.orm.jdbc.bind) would log password and token hashes; keep it off.
 logging:

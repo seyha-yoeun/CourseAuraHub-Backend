@@ -20,4 +20,7 @@ public interface GiftService {
     List<GiftDtos.Code> findCodes(String batch);
 
     GiftDtos.Code revoke(Integer id);
+
+    /** The full code of an admin-issued access code, decrypted for an admin. */
+    GiftDtos.RevealedCode reveal(Integer id);
 }
