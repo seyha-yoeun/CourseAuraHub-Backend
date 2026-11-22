@@ -36,8 +36,13 @@ public final class GiftDtos {
     }
 
     /** A code as admins and buyers see it after issue: the full code is never shown again. */
+    /** revealable: an admin can fetch the full code (it was issued while the encryption key was configured). */
     public record Code(Integer id, String hint, String courseSlug, String courseTitle, String batch, int uses, int maxUses,
-                       Instant expiresAt, boolean revoked, String status, Instant createdAt) {
+                       Instant expiresAt, boolean revoked, String status, Instant createdAt, boolean revealable) {
+    }
+
+    /** A full access code, shown to an admin on request. */
+    public record RevealedCode(Integer id, String code) {
     }
 
     /** Freshly issued codes; this is the only time the full codes are returned. */

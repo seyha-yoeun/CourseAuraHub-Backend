@@ -24,8 +24,30 @@ the Compose file lives in `infrastructure/`, and `--env-file` passes the root `.
 | Restart after a config change | `docker compose -f infrastructure/docker-compose.yaml --env-file .env --profile logging restart loki alloy grafana` |
 | Follow stack logs | `docker compose -f infrastructure/docker-compose.yaml --env-file .env --profile logging logs -f loki alloy grafana` |
 
-Restart the backend once after pulling this change, so it starts writing the log file. The file is
-read from the start, so anything written while the stack was down is shipped when it comes back.
+Then start the backend as usual (from the backend root) and open http://localhost:3001: the
+**CourseAuraHub Logs** dashboard is under **Dashboards > CourseAuraHub**. The log file is read from the
+start, so anything written while the stack was down is shipped when it comes back.
+
+## Dashboard and filters
+
+The filters at the top apply to every panel, together with Grafana's time picker (top right):
+
+| Filter | What it does |
+|---|---|
+| **Service** | One or more `service` label values, or All |
+| **Level** | ERROR, WARN, INFO, DEBUG, TRACE: pick one or several, or All |
+| **Search** | Case-insensitive text or regular expression on the whole line, such as a `requestId`, a route or an exception name. Leave it empty for everything |
+
+| Panel | Shows |
+|---|---|
+| Log lines, Errors, Warnings, Failed requests (5xx) | Counts for the selected time range. Errors and Warnings ignore the Level filter |
+| Log volume by level | Lines over time, stacked by level |
+| Request latency (p95, ms) | 95th percentile of `duration_ms` from request lines |
+| Errors, Failed requests (5xx) | The matching lines, newest first. Open one to see `stack_trace` and `requestId` |
+| Logs | Every line matching all three filters |
+
+The dashboard is provisioned from a file and read-only in Grafana. To change it, edit
+`infrastructure/observability/grafana/dashboards/course-aura-logs.json`; Grafana reloads it within a minute.
 
 ## Ports and sign-in
 
@@ -43,10 +65,10 @@ when the Grafana volume is first created. `GRAFANA_PORT` changes the published p
 | Path | Purpose |
 |---|---|
 | `infrastructure/docker-compose.yaml` | The `loki`, `alloy` and `grafana` services |
-| `infrastructure/observability/loki/loki-config.yaml` | Storage and retention |
-| `infrastructure/observability/alloy/config.alloy` | File tailing, redaction, labels and timestamps |
+| `infrastructure/observability/loki/loki-config.yaml` | Storage, retention, flushing on shutdown, and querying unflushed data |
+| `infrastructure/observability/alloy/config.alloy` | File tailing, redaction and email masking, labels and timestamps |
 | `infrastructure/observability/grafana/provisioning/` | The Loki data source and dashboard loader |
-| `infrastructure/observability/grafana/dashboards/course-aura-logs.json` | Starter dashboard |
+| `infrastructure/observability/grafana/dashboards/course-aura-logs.json` | The CourseAuraHub Logs dashboard |
 | `src/main/resources/application.yml` | Log file path, JSON format and rotation |
 | `src/main/java/.../common/logging/RequestLoggingFilter.java` | One log line per request, and the request id |
 
@@ -55,7 +77,7 @@ when the Grafana volume is first created. `GRAFANA_PORT` changes the published p
 
 ## Log fields
 
-Labels are `service`, `level`, `job` and `filename`. Everything else is a JSON field read with `| json`:
+Labels are `service`, `level`, `job` and `filename` (Loki also adds `service_name`). Everything else is a JSON field read with `| json`:
 
 | Field | Meaning |
 |---|---|
@@ -89,11 +111,12 @@ CourseAuraHub Logs**.
 # One exception type
 {service="course-aura-hub"} |= "IllegalStateException"
 
-# Failed requests
-{service="course-aura-hub"} | json | http_status >= 500
+# Failed requests. Match the status as text: most lines have no http_status, and a numeric
+# comparison like `http_status >= 500` turns those into errors
+{service="course-aura-hub"} | json | http_status =~ "5[0-9]{2}"
 
-# Slow requests
-{service="course-aura-hub"} | json | duration_ms > 1000
+# Slow requests (skip lines without a duration first, for the same reason)
+{service="course-aura-hub"} | json | duration_ms != "" | duration_ms > 1000
 
 # Requests to one route
 {service="course-aura-hub"} | json | http_path =~ "/api/v1/me/cart.*"
@@ -108,7 +131,8 @@ sum(count_over_time({service="course-aura-hub", level="ERROR"}[1m]))
 ## Investigate a failed API request
 
 1. Note the time, route and status from the browser's Network tab.
-2. Find the request line: `{service="course-aura-hub"} | json | http_status >= 400 | http_path =~ "/api/v1/me/cart.*"`.
+2. Find the request line: `{service="course-aura-hub"} | json | http_status =~ "[45][0-9]{2}" | http_path =~ "/api/v1/me/cart.*"`,
+   or type the route into the dashboard's **Search** filter.
 3. Expand it and copy `requestId`. If you called the backend directly, it's also the `X-Request-Id`
    response header. The Nuxt proxy doesn't pass that header on, so calls from the browser need this step.
 4. Run `{service="course-aura-hub"} | json | requestId = "PASTE-THE-ID"` to see the whole request.
@@ -121,8 +145,10 @@ sum(count_over_time({service="course-aura-hub", level="ERROR"}[1m]))
 - Bind-parameter tracing stays off.
 - Alloy also replaces `Bearer ...` values and JWT-shaped strings with `[REDACTED]` before they reach
   Loki. That is a backstop only: `logs/course-aura-hub.log` itself isn't redacted.
-- Existing log lines include email addresses, and a database constraint error can include the value
-  that clashed. Treat the log file and Grafana as personal data, and don't share them.
+- Some lines name the user's email (sign-in, password and profile changes). Alloy masks the part before
+  the `@`, so Grafana shows `***@example.com`; the log file on disk keeps the full address for debugging.
+- A database constraint error can include the value that clashed. Treat the log file and Grafana as
+  personal data, and don't share them.
 
 ## Log retention
 
@@ -133,11 +159,24 @@ sum(count_over_time({service="course-aura-hub", level="ERROR"}[1m]))
 
 To change Loki's retention, edit `retention_period` and `reject_old_samples_max_age` together.
 
+## Storage locations
+
+| What | Where | Survives |
+|---|---|---|
+| Application log file | `logs/course-aura-hub.log` in the backend root (the path is relative to where the backend runs). Rotated files sit next to it as `course-aura-hub.log.YYYY-MM-DD.N.gz` | Everything, until rotation deletes it |
+| Loki: chunks, index, write-ahead log, compactor state | Docker volume `course-aura-hub-backend_loki_data`, mounted at `/loki` | Restarts, recreating the container, `down` without `-v` |
+| Alloy: how far the file has been read | Docker volume `course-aura-hub-backend_alloy_data` | The same |
+| Grafana: users, preferences, sign-in | Docker volume `course-aura-hub-backend_grafana_data`. Dashboards and the data source come from the files above | The same |
+
+Docker Desktop keeps volumes inside its own VM; `docker volume inspect course-aura-hub-backend_loki_data`
+shows the path there. Loki writes its in-memory chunks to the volume when it stops, and it queries them
+before they're written, so lines received just before a restart, or caught up on after downtime, are
+neither lost nor hidden.
+
 ## Data persistence and clean-up
 
-Data lives in the volumes `course-aura-hub-backend_loki_data`, `_alloy_data` and `_grafana_data`, which
-survive restarts. `_alloy_data` remembers how far the file has been read, which stops lines being
-sent twice.
+The volumes above survive restarts. `_alloy_data` remembers how far the file has been read, which stops
+lines being sent twice.
 
 > **Don't run `docker compose -f infrastructure/docker-compose.yaml --env-file .env down -v` to clear logs.** It also deletes the Postgres data.
 

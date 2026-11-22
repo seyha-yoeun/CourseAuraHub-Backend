@@ -17,6 +17,7 @@ import com.course_aura_hub.gift.model.AccessCode;
 import com.course_aura_hub.gift.model.AccessCodeRedemption;
 import com.course_aura_hub.gift.repository.AccessCodeRedemptionRepository;
 import com.course_aura_hub.gift.repository.AccessCodeRepository;
+import com.course_aura_hub.gift.security.AccessCodeCipher;
 import com.course_aura_hub.learner.service.LearnerAccountService;
 import com.course_aura_hub.notification.model.NotificationType;
 import com.course_aura_hub.notification.service.NotificationService;
@@ -70,6 +71,7 @@ public class GiftServiceImpl implements GiftService {
     private final CheckoutFacade checkoutFacade;
     private final EmailSender emailSender;
     private final TokenHasher tokenHasher;
+    private final AccessCodeCipher codeCipher;
 
     @Override
     public OrderResponse sendGift(String email, GiftDtos.GiftRequest request) {
@@ -191,6 +193,7 @@ public class GiftServiceImpl implements GiftService {
             String raw = newCode();
             codeRepository.save(AccessCode.builder()
                     .codeHash(hash(raw))
+                    .codeCiphertext(codeCipher.encrypt(raw).orElse(null))
                     .codeHint(raw.substring(raw.length() - 4))
                     .course(course)
                     .batch(batch)
@@ -223,10 +226,36 @@ public class GiftServiceImpl implements GiftService {
         return toCode(code);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public GiftDtos.RevealedCode reveal(Integer id) {
+        AccessCode code = codeRepository.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Access code", id));
+        if (code.getGiftOrderId() != null) {
+            // Gift codes belong to their recipient
+            throw new BusinessRuleException("Gift codes can't be revealed");
+        }
+        if (code.getCodeCiphertext() == null) {
+            throw new BusinessRuleException("This code was issued before full codes were kept, so it can't be shown. "
+                    + "Revoke it and issue a new one if it's lost.");
+        }
+        if (!codeCipher.isAvailable()) {
+            throw new BusinessRuleException("Full codes can't be shown: the access code encryption key isn't configured");
+        }
+        String raw;
+        try {
+            raw = codeCipher.decrypt(code.getCodeCiphertext());
+        } catch (IllegalStateException ex) {
+            log.error("Access code could not be decrypted codeId={}", id, ex);
+            throw new BusinessRuleException("This code can't be shown: the encryption key changed since it was issued");
+        }
+        log.info("Access code revealed codeId={}", id);
+        return new GiftDtos.RevealedCode(code.getId(), raw);
+    }
+
     private GiftDtos.Code toCode(AccessCode code) {
         return new GiftDtos.Code(code.getId(), code.getCodeHint(), code.getCourse().getSlug(), code.getCourse().getTitle(),
                 code.getBatch(), code.getUses(), code.getMaxUses(), code.getExpiresAt(), code.isRevoked(), status(code),
-                code.getCreatedAt());
+                code.getCreatedAt(), code.getGiftOrderId() == null && code.getCodeCiphertext() != null);
     }
 
     private static String status(AccessCode code) {

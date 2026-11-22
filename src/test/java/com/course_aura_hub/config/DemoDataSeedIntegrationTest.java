@@ -29,12 +29,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Starts the app with demo data enabled on its own database, so the seed never leaks into the shared test database.
+ * Starts the app with demo data enabled on its own database, so the seed (which empties every table) never touches
+ * the shared test database.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @Import(TestEmailConfiguration.class)
-class DemoLifecycleSeedIntegrationTest {
+class DemoDataSeedIntegrationTest {
 
     private static final String PASSWORD = "Demo@2026!";
 
@@ -69,32 +70,33 @@ class DemoLifecycleSeedIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
-    private DemoLifecycleSeeder seeder;
+    private DemoDataSeeder seeder;
 
     @Test
-    void everyRoleCanSignIn_butUnverifiedAndDisabledAccountsCannot() throws Exception {
-        for (String email : List.of("admin@demo.courseaurahub.io", "sokha.chan@demo.courseaurahub.io",
-                "lina.meas@demo.courseaurahub.io", "vannak.kim@demo.courseaurahub.io", "bopha.lim@demo.courseaurahub.io")) {
+    void everyRoleCanSignIn_butUnverifiedDisabledAndLockedAccountsCannot() throws Exception {
+        for (String email : List.of("admin@demo.courseaurahub.io", "support@demo.courseaurahub.io", "sokha.chan@demo.courseaurahub.io",
+                "vannak.kim@demo.courseaurahub.io", "sreymom.chea@demo.courseaurahub.io", "bopha.lim@demo.courseaurahub.io")) {
             login(email).andExpect(status().isOk());
         }
         login("pending.signup@demo.courseaurahub.io").andExpect(status().is4xxClientError());
         login("disabled.account@demo.courseaurahub.io").andExpect(status().is4xxClientError());
+        login("locked.account@demo.courseaurahub.io").andExpect(status().is4xxClientError());
     }
 
     @Test
-    void everyLifecycleTableHasData() {
-        for (String table : List.of("users", "students", "courses", "course_sections", "lessons", "quiz_questions", "assignments",
-                "assignment_submissions", "lesson_progress", "lesson_watch_positions", "lesson_notes", "lesson_questions",
-                "lesson_answers", "quiz_attempts", "quiz_attempt_grants", "course_certificates", "course_reviews", "wishlist_items",
-                "cart_items", "orders", "order_groups", "coupons", "course_discounts", "member_card_applications", "member_cards",
-                "member_card_transactions", "member_card_top_up_requests", "notifications", "course_announcements",
-                "instructor_profiles", "learning_paths", "learning_path_courses", "learning_path_certificates",
-                "learner_reminders", "admin_audit_events")) {
+    void everyTableHasData_andTheMigrationSamplesAreGone() {
+        List<String> tables = jdbcTemplate.queryForList("""
+                select tablename from pg_tables where schemaname = 'public'
+                  and tablename not in ('flyway_schema_history', 'demo_seed_history')
+                """, String.class);
+        assertThat(tables).hasSizeGreaterThan(90);
+        for (String table : tables) {
             assertThat(count("select count(*) from " + table)).as(table).isPositive();
         }
+        assertThat(count("select count(*) from users where email not like '%@demo.courseaurahub.io'")).isZero();
         assertThat(count("select count(distinct status) from orders")).isEqualTo(5);
-        assertThat(count("select count(*) from courses where status = 'PENDING_REVIEW'")).isPositive();
-        assertThat(count("select count(*) from courses where status = 'DRAFT' and review_note is not null")).isPositive();
+        assertThat(count("select count(distinct status) from subscriptions")).isEqualTo(5);
+        assertThat(count("select count(distinct status) from courses")).isEqualTo(4);
     }
 
     @Test
@@ -105,54 +107,60 @@ class DemoLifecycleSeedIntegrationTest {
                 where c.balance <> coalesce((select t.balance_after from member_card_transactions t
                                              where t.card_id = c.id order by t.created_at desc, t.id desc limit 1), 0)
                 """)).isZero();
-        // Lesson totals match the curriculum on every course the seed gave lessons to
+        // Course counters match the rows they count
         assertThat(count("""
                 select count(*) from courses c
-                where c.slug in ('python-for-data-analysis', 'ux-research-essentials', 'typescript-for-vue-devs', 'docker-kubernetes-devops')
-                  and c.total_lessons <> (select count(*) from lessons l join course_sections s on s.id = l.section_id where s.course_id = c.id)
+                where c.total_students <> (select count(*) from student_courses sc where sc.course_id = c.id)
+                   or c.total_lessons <> (select count(*) from lessons l join course_sections s on s.id = l.section_id where s.course_id = c.id)
+                   or c.revenue <> coalesce((select sum(amount) from enrollments e where e.course_id = c.id), 0)
                 """)).isZero();
-        // Every completed course of a demo learner has its certificate
+        // Every completed course has its certificate
         assertThat(count("""
-                select count(*) from student_courses sc join students s on s.id = sc.student_id
-                where sc.completed and s.email like '%@demo.courseaurahub.io'
-                  and not exists (select 1 from course_certificates cc where cc.student_id = sc.student_id and cc.course_id = sc.course_id)
+                select count(*) from student_courses sc
+                where sc.completed and not exists (select 1 from course_certificates cc where cc.student_id = sc.student_id and cc.course_id = sc.course_id)
                 """)).isZero();
-        // Every enrollment link has its ledger row
+        // Gated lessons were only completed by passing them
         assertThat(count("""
-                select count(*) from student_courses sc join students s on s.id = sc.student_id
-                where s.user_id is not null
-                  and not exists (select 1 from enrollments e where e.student_id = sc.student_id and e.course_id = sc.course_id)
+                select count(*) from lesson_progress lp join lessons l on l.id = lp.lesson_id and l.type = 'QUIZ'
+                where not exists (select 1 from quiz_attempts a where a.student_id = lp.student_id and a.lesson_id = l.id and a.passed)
                 """)).isZero();
+        assertThat(count("""
+                select count(*) from lesson_progress lp join code_exercises e on e.lesson_id = lp.lesson_id
+                where not exists (select 1 from code_submissions s where s.student_id = lp.student_id and s.lesson_id = lp.lesson_id and s.passed)
+                """)).isZero();
+        // Nothing happened in the future
+        assertThat(count("select count(*) from lesson_progress where completed_at > now()")).isZero();
+        assertThat(count("select count(*) from notifications where created_at > now()")).isZero();
+        // Every hash placeholder was replaced
+        assertThat(count("select count(*) from access_codes where code_hash like 'seed:%'")).isZero();
+        assertThat(count("select count(*) from calendar_tokens where token_hash like 'seed:%'")).isZero();
+        assertThat(count("select count(*) from organization_invites where token_hash like 'seed:%'")).isZero();
     }
 
     @Test
-    void theApiShowsEachLifecycleState() throws Exception {
+    void theApiShowsTheSeededJourneys() throws Exception {
         String learner = token("vannak.kim@demo.courseaurahub.io");
         mockMvc.perform(get("/api/v1/me/courses").header("Authorization", "Bearer " + learner))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(3));
-        // Sequential course: the lesson after Vannak's progress is open, the one after that waits
+                .andExpect(jsonPath("$.data.length()").value(4));
         String curriculum = mockMvc.perform(get("/api/v1/courses/python-for-data-analysis/curriculum").header("Authorization", "Bearer " + learner))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.sequentialLessons").value(true))
                 .andReturn().getResponse().getContentAsString();
-        List<String> reasons = JsonPath.read(curriculum, "$.data.sections[*].lessons[*].lockReason");
-        assertThat(reasons).contains("sequence");
+        String videoUrl = JsonPath.read(curriculum, "$.data.sections[0].lessons[0].contentUrl");
+        assertThat(videoUrl).contains("youtube.com/watch?v=lYm8KEuWeNk");
 
-        String instructor = token("sokha.chan@demo.courseaurahub.io");
-        mockMvc.perform(get("/api/v1/instructor/courses/python-for-data-analysis/analytics").header("Authorization", "Bearer " + instructor))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.learners.enrolled").value(8))
-                .andExpect(jsonPath("$.data.assignments.pendingReview").value(1));
+        // The seeded calendar token was hashed with the app's own hasher, so the feed opens
+        mockMvc.perform(get("/api/v1/calendar/vannak-calendar-demo-token-2026.ics")).andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/v1/learning-paths")).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(2));
+        mockMvc.perform(get("/api/v1/learning-paths")).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(4));
         mockMvc.perform(get("/api/v1/instructors/sokha-chan")).andExpect(status().isOk());
     }
 
     @Test
-    void runningTheSeedAgainChangesNothing() {
+    void runningTheSeederAgainChangesNothing() throws Exception {
         Map<String, Object> before = jdbcTemplate.queryForMap(SNAPSHOT);
-        seeder.seed();
+        seeder.run(null);
         assertThat(jdbcTemplate.queryForMap(SNAPSHOT)).isEqualTo(before);
     }
 

@@ -43,6 +43,16 @@ compactor:
   retention_delete_delay: 2h
   delete_request_store: filesystem
 
+ingester:
+  wal:
+    # Write in-memory chunks to /loki on a clean stop, so lines received just before a restart aren't lost
+    flush_on_shutdown: true
+
+querier:
+  # Always ask the ingester too. By default it is only asked about the last 3h, so lines Alloy catches up
+  # on after downtime stay invisible until their chunk is flushed (up to 30 minutes later)
+  query_ingesters_within: 0
+
 ruler:
   enable_api: false
 

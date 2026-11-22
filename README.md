@@ -61,20 +61,27 @@ docker compose -f infrastructure/docker-compose.yaml --env-file .env up -d
 
 Flyway creates the schema and seeds sample data on first start: about a year of mock courses, students and enrollments, plus a free starter course (**Git & GitHub Fundamentals**) with a full curriculum.
 
-**Demo data for the whole app:** set `DEMO_DATA_ENABLED=true` (and optionally `DEMO_PASSWORD`, default `Demo@2026!`) and restart. It seeds once, on top of the sample catalog, with accounts that all sign in with that password:
+**Demo data for the whole app (local only):** set `DEMO_DATA_ENABLED=true` (and optionally `DEMO_PASSWORD`, default `Demo@2026!`) and restart. On its first run against a local database it **empties every table** (including the migration sample data) and fills all of them from `src/main/resources/demo/seed.sql`: 9 instructors, about 200 learners, 36 courses with around 600 lessons, orders in every status, subscriptions, member cards, gifts, organizations, live classes, surveys, notifications and more. It runs once per database (`demo_seed_history`), and refuses any host not in `DEMO_DATA_LOCAL_HOSTS`. Every video lesson plays the same YouTube video. To reseed, drop the database and start again. LOCAL accounts all sign in with that password:
 
 | Account | Role | What you'll see |
 |---|---|---|
-| `admin@demo.courseaurahub.io` | Admin | A course waiting for review, a pending card application and top-up, refunds, the audit log |
-| `sokha.chan@demo.courseaurahub.io` | Instructor | A published course (sequential lessons, drip, timed quiz, assignment) with analytics, one in review, one sent back, a submission to grade, an open question |
-| `lina.meas@demo.courseaurahub.io` | Instructor | A course on sale and an empty draft |
-| `vannak.kim@demo.courseaurahub.io` | Learner | Three courses in progress, notes, Q&A, a cart, a member card with history and a pending top-up |
-| `sreymom.chea@demo.courseaurahub.io` | Learner | Finished courses, certificates, a completed learning path, reviews |
-| `rithy.pov@demo.courseaurahub.io` | Learner | Out of quiz attempts (with one granted back), a reminder, failed and cancelled payments, a pending card application |
-| `nita.ouk@demo.courseaurahub.io` | Learner | A refund, a cart checkout awaiting payment, a rejected card application |
-| `bopha.lim@demo.courseaurahub.io` | Learner | A brand-new account with a wishlist |
+| `admin@demo.courseaurahub.io` | Admin | Courses waiting for review, card applications and top-ups, refund requests, payouts to approve, reports, the audit log |
+| `support@demo.courseaurahub.io` | Admin | A second admin (also teaches Public Speaking) |
+| `sokha.chan@demo.courseaurahub.io` | Instructor | Python for Data Analysis (sequential, drip, timed quiz, required assignment, coding exercises), SQL, data viz, earnings and payouts |
+| `lina.meas@`, `dara.pich@`, `visal.tan@`, `maly.nguon@`, `ratanak.seng@`, `sreyneang.prak@`, `kimheng.long@`, `sophal.keo@` | Instructor | Their own courses, Q&A inbox, submissions, live classes, surveys, announcements, payouts |
+| `vannak.kim@demo.courseaurahub.io` | Learner | Four courses (one finished), member card with history and a pending top-up, cart, wishlist, Q&A, referral code `VANNAK26`, calendar feed |
+| `sreymom.chea@demo.courseaurahub.io` | Learner | Five finished courses, certificates, the Frontend Developer path certificate, reviews |
+| `rithy.pov@demo.courseaurahub.io` | Learner | Out of quiz attempts (one granted back), failed and cancelled payments, a pending card application |
+| `nita.ouk@demo.courseaurahub.io` | Learner | A refund, a cart checkout awaiting payment, a pending refund request, a rejected card application |
+| `bopha.lim@demo.courseaurahub.io` | Learner | A brand-new account with a wishlist; gift code `DEMO-GIFT-2026-0001` is addressed to her |
+| `kosal.heng@demo.courseaurahub.io` | Learner | Yearly all-access subscription with courses enrolled through it |
+| `malis.tep@demo.courseaurahub.io` | Learner | Owner of the Angkor Tech Solutions organization (seats, members, invites) |
+| `piseth.ros@demo.courseaurahub.io` | Learner | Bought gifts for other learners |
+| `sovann.chhay@demo.courseaurahub.io` | Learner | Two-factor sign-in (needs `MFA_ENCRYPTION_KEY`): TOTP secret `JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP`, recovery codes `demo-rc01-2026` to `demo-rc09-2026` |
+| `chantha.mao@demo.courseaurahub.io` | Learner | Password account with a linked GitHub identity |
+| `firstname.lastname@demo.courseaurahub.io` | Learner | The bulk learners, for example `sophea.sok@`, `dara.yim@`, `vuthy.ros@` |
 
-`pending.signup@…` never verified its email and `disabled.account@…` is disabled, so neither can sign in. Never enable demo data in production.
+`pending.signup@…` never verified its email, `disabled.account@…` is disabled and `locked.account@…` is locked after failed attempts, so none can sign in. A few bulk accounts were created through Google, GitHub or Facebook and have no password. Batch access code `CAMP-2026-0000-0001` (Docker & Kubernetes) and the calendar feed `/api/v1/calendar/vannak-calendar-demo-token-2026.ics` work too. Never enable demo data in production.
 
 **Creating an admin account:** set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` in `.env` before starting the app. To promote accounts that already exist, list their emails in `BOOTSTRAP_ADMIN_PROMOTE_EMAILS`.
 

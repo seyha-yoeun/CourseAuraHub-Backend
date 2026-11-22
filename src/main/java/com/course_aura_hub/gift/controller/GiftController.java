@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -67,6 +68,16 @@ public class GiftController {
     @Operation(summary = "Access codes", description = "Admin-only. One batch, or every admin-issued code. Shows the last characters only.")
     public ResponseEntity<ApiResponse<List<GiftDtos.Code>>> codes(@RequestParam(required = false) String batch) {
         return ResponseEntity.ok(ApiResponse.success(giftService.findCodes(batch)));
+    }
+
+    /** POST so the admin audit trail records every reveal (it audits write methods). */
+    @PostMapping("/api/v1/admin/access-codes/{id}/reveal")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Reveal a code", description = "Admin-only. The full code of an admin-issued code. Recorded in the audit log.")
+    public ResponseEntity<ApiResponse<GiftDtos.RevealedCode>> reveal(@PathVariable Integer id) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(ApiResponse.success(giftService.reveal(id)));
     }
 
     @DeleteMapping("/api/v1/admin/access-codes/{id}")
