@@ -20,6 +20,8 @@ import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.course.repository.CourseRepository;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.user.SimpUser;
 import org.springframework.messaging.simp.user.SimpUserRegistry;
@@ -66,6 +68,8 @@ public class ChatDispatcher implements ClusterChannelHandler {
     private final ChatAccess access;
     private final ChatPeople people;
     private final ChatViews views;
+    private final ChatPresence presence;
+    private final NamedParameterJdbcTemplate jdbc;
     private final TransactionTemplate readOnly;
     private final ThreadPoolExecutor executor = new ThreadPoolExecutor(2, 2, 30, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(5_000), Thread.ofPlatform().name("chat-dispatch-", 0).daemon().factory());
@@ -83,6 +87,8 @@ public class ChatDispatcher implements ClusterChannelHandler {
             ChatAccess access,
             ChatPeople people,
             ChatViews views,
+            ChatPresence presence,
+            NamedParameterJdbcTemplate jdbc,
             PlatformTransactionManager transactionManager
     ) {
         this.messagingTemplate = messagingTemplate;
@@ -97,6 +103,8 @@ public class ChatDispatcher implements ClusterChannelHandler {
         this.access = access;
         this.people = people;
         this.views = views;
+        this.presence = presence;
+        this.jdbc = jdbc;
         this.readOnly = new TransactionTemplate(transactionManager);
         this.readOnly.setReadOnly(true);
     }
@@ -169,12 +177,20 @@ public class ChatDispatcher implements ClusterChannelHandler {
                             Map.of("inviteId", signal.refId(), "conversationId", signal.conversationId()));
                 }
             }
+            case MESSAGE_REMOVED -> {
+                if (online.contains(signal.targetId())) {
+                    send(signal.targetId(), signal.kind().eventType(),
+                            Map.of("conversationId", signal.conversationId(), "messageId", signal.refId()));
+                    sendUnread(signal.targetId());
+                }
+            }
             case ACCESS_LOST -> {
                 if (online.contains(signal.targetId())) {
                     send(signal.targetId(), signal.kind().eventType(), Map.of("conversationId", signal.conversationId()));
                     sendUnread(signal.targetId());
                 }
             }
+            case PRESENCE -> sendPresence(signal.actorId(), online);
             default -> conversationRepository.findById(signal.conversationId())
                     .ifPresent(conversation -> routeConversation(signal, conversation, online));
         }
@@ -188,7 +204,13 @@ public class ChatDispatcher implements ClusterChannelHandler {
                 if (message == null) {
                     return;
                 }
+                // Someone who deleted a message for themselves doesn't get its later updates
+                Set<UUID> removed = signal.kind() == ChatSignal.Kind.MESSAGE_UPDATED
+                        ? hiddenFor(message.getId(), readers) : Set.of();
                 for (UUID reader : readers) {
+                    if (removed.contains(reader)) {
+                        continue;
+                    }
                     send(reader, signal.kind().eventType(), views.message(reader, message));
                     if (signal.kind() == ChatSignal.Kind.MESSAGE_CREATED && !reader.equals(message.getSenderId())) {
                         sendUnread(reader);
@@ -245,6 +267,34 @@ public class ChatDispatcher implements ClusterChannelHandler {
         }
     }
 
+    /** Tells the people connected here who share a direct conversation with the user (and no block) their status. */
+    private void sendPresence(UUID userId, Set<UUID> online) {
+        Set<UUID> candidates = new HashSet<>(online);
+        candidates.remove(userId);
+        if (userId == null || candidates.isEmpty()) {
+            return;
+        }
+        List<UUID> contacts = jdbc.queryForList("""
+                select distinct other.user_id
+                from chat_participants me
+                join chat_conversations c on c.id = me.conversation_id and c.type = 'DIRECT'
+                join chat_participants other on other.conversation_id = c.id and other.user_id <> me.user_id
+                where me.user_id = :userId and me.left_at is null and other.left_at is null
+                  and other.user_id in (:candidates)
+                  and not exists (select 1 from chat_blocks b
+                                  where (b.blocker_id = me.user_id and b.blocked_id = other.user_id)
+                                     or (b.blocker_id = other.user_id and b.blocked_id = me.user_id))
+                """, new MapSqlParameterSource("userId", userId).addValue("candidates", candidates), UUID.class);
+        if (contacts.isEmpty()) {
+            return;
+        }
+        // Null when they hide their status: contacts then stop showing it
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", userId);
+        data.put("presence", presence.shared(userId));
+        contacts.forEach(contact -> send(contact, "presence", data));
+    }
+
     private void sendInvite(ChatGroupInvite invite) {
         ChatConversation group = conversationRepository.findById(invite.getConversationId()).orElse(null);
         if (group == null) {
@@ -269,6 +319,15 @@ public class ChatDispatcher implements ClusterChannelHandler {
         } catch (ResourceNotFoundException | ForbiddenActionException ex) {
             // Lost access between routing and loading; nothing to send
         }
+    }
+
+    private Set<UUID> hiddenFor(Integer messageId, Set<UUID> readers) {
+        if (readers.isEmpty()) {
+            return Set.of();
+        }
+        return new HashSet<>(jdbc.queryForList(
+                "select user_id from chat_message_hidden_for where message_id = :messageId and user_id in (:readers)",
+                new MapSqlParameterSource("messageId", messageId).addValue("readers", readers), UUID.class));
     }
 
     private void sendUnread(UUID userId) {

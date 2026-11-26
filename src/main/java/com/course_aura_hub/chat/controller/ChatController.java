@@ -46,12 +46,15 @@ public class ChatController {
     }
 
     @GetMapping("/api/v1/me/chat/conversations")
-    @Operation(summary = "My conversations", description = "Any signed-in user. Most recent activity first; pass nextCursor to page.")
+    @Operation(summary = "My conversations",
+            description = "Any signed-in user. Most recent activity first; pass nextCursor to page. With hidden=true, "
+                    + "only the ones I hid from my list that have had no new message since.")
     public ResponseEntity<ApiResponse<ChatDtos.ConversationPage>> conversations(
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(defaultValue = "false") boolean hidden,
             @AuthenticationPrincipal AuthUserPrincipal user) {
-        return ResponseEntity.ok(ApiResponse.success(chatService.conversations(Actor.of(user), cursor, limit)));
+        return ResponseEntity.ok(ApiResponse.success(chatService.conversations(Actor.of(user), cursor, limit, hidden)));
     }
 
     @GetMapping("/api/v1/me/chat/unread-count")
@@ -142,10 +145,34 @@ public class ChatController {
     }
 
     @DeleteMapping("/api/v1/me/chat/messages/{id}")
-    @Operation(summary = "Delete my message", description = "The sender only, within 15 minutes of sending.")
+    @Operation(summary = "Unsend my message", description = "The sender only, within 15 minutes of sending. It is removed for everyone.")
     public ResponseEntity<ApiResponse<ChatDtos.Message>> deleteMessage(@PathVariable Integer id,
                                                                       @AuthenticationPrincipal AuthUserPrincipal user) {
         return ResponseEntity.ok(ApiResponse.success("Message deleted", chatService.deleteMessage(Actor.of(user), id)));
+    }
+
+    @DeleteMapping("/api/v1/me/chat/messages/{id}/for-me")
+    @Operation(summary = "Delete a message for me",
+            description = "Its conversation's members only. Removes any message from your own view; everyone else still sees it.")
+    public ResponseEntity<ApiResponse<Void>> deleteForMe(@PathVariable Integer id, @AuthenticationPrincipal AuthUserPrincipal user) {
+        chatService.deleteForMe(Actor.of(user), id);
+        return ResponseEntity.ok(ApiResponse.success("Message deleted for you", null));
+    }
+
+    @PutMapping("/api/v1/me/chat/messages/{id}/reaction")
+    @Operation(summary = "React to a message",
+            description = "Members who can send in its conversation. One reaction per person: 👍 ❤️ 😂 😮 😢 or 🎉; "
+                    + "reacting again with another emoji replaces it.")
+    public ResponseEntity<ApiResponse<ChatDtos.Message>> react(@PathVariable Integer id, @Valid @RequestBody ChatDtos.ReactRequest request,
+                                                              @AuthenticationPrincipal AuthUserPrincipal user) {
+        return ResponseEntity.ok(ApiResponse.success(chatService.react(Actor.of(user), id, request.emoji())));
+    }
+
+    @DeleteMapping("/api/v1/me/chat/messages/{id}/reaction")
+    @Operation(summary = "Remove my reaction", description = "Its conversation's members only.")
+    public ResponseEntity<ApiResponse<ChatDtos.Message>> unreact(@PathVariable Integer id,
+                                                                @AuthenticationPrincipal AuthUserPrincipal user) {
+        return ResponseEntity.ok(ApiResponse.success(chatService.unreact(Actor.of(user), id)));
     }
 
     @PostMapping("/api/v1/me/chat/messages/{id}/hide")

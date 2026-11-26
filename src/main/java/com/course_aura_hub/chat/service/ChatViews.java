@@ -17,8 +17,12 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -32,11 +36,14 @@ import java.util.stream.Collectors;
 public class ChatViews {
 
     private static final int PREVIEW_LENGTH = 120;
+    // People named on a reaction, for its "Jane L., Bo K. and 4 others" label
+    private static final int REACTION_NAMES = 3;
 
     private final ChatMessageRepository messageRepository;
     private final ChatAttachmentRepository attachmentRepository;
     private final ChatParticipantRepository participantRepository;
     private final ChatPeople people;
+    private final ChatPresence presence;
     private final FileService fileService;
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -50,8 +57,9 @@ public class ChatViews {
         if (conversation.getType() == ConversationType.SUPPORT && conversation.getCreatedBy() != null) {
             ids.add(conversation.getCreatedBy());
         }
-        ChatMessage last = conversation.getLastMessageId() == null
-                ? null : messageRepository.findById(conversation.getLastMessageId()).orElse(null);
+        // The newest message this viewer still sees (they may have deleted the last one for themselves)
+        ChatMessage last = conversation.getLastMessageId() == null ? null
+                : messageRepository.findLatestVisibleUpTo(conversation.getId(), conversation.getLastMessageId(), viewerId).orElse(null);
         if (last != null && last.getSenderId() != null) {
             ids.add(last.getSenderId());
         }
@@ -81,29 +89,111 @@ public class ChatViews {
                 last == null ? null : lastMessage(last, named),
                 participant == null || !participant.isActive() ? 0 : unread(conversation.getId(), viewerId, participant.getLastReadMessageId()),
                 participant != null && participant.isMuted(),
+                isHidden(conversation, participant),
                 view.canSend(),
                 view.readOnlyReason(),
                 participant == null || !participant.isActive() ? null : lower(participant.getRole()),
                 participant == null ? 0 : participant.getLastReadMessageId(),
                 group,
                 receipt,
+                conversation.getType() == ConversationType.DIRECT ? presence.forViewer(viewerId, view.peerId()) : null,
                 conversation.getLastActivityAt());
+    }
+
+    /** Hidden from the viewer's list: they hid it and nothing happened in it since. */
+    static boolean isHidden(ChatConversation conversation, ChatParticipant participant) {
+        return participant != null && participant.isActive() && participant.getHiddenAt() != null
+                && !conversation.getLastActivityAt().isAfter(participant.getHiddenAt());
     }
 
     public List<ChatDtos.Message> messages(UUID viewerId, List<ChatMessage> messages) {
         if (messages.isEmpty()) {
             return List.of();
         }
-        Map<UUID, ChatDtos.Person> named = people.lookup(viewerId,
-                messages.stream().map(ChatMessage::getSenderId).filter(java.util.Objects::nonNull).collect(Collectors.toSet()));
-        Map<Integer, List<ChatAttachment>> files = attachmentRepository
-                .findByMessageIdInOrderByIdAsc(messages.stream().map(ChatMessage::getId).toList()).stream()
+        // Quoted messages, loaded in one go for the whole page
+        Set<Integer> replyIds = messages.stream().map(ChatMessage::getReplyToMessageId)
+                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Map<Integer, ChatMessage> quoted = replyIds.isEmpty() ? Map.of()
+                : messageRepository.findAllById(replyIds).stream().collect(Collectors.toMap(ChatMessage::getId, item -> item));
+        Map<Integer, Map<String, Tally>> reactions = reactions(viewerId, messages);
+        Set<UUID> senders = new HashSet<>();
+        messages.forEach(message -> senders.add(message.getSenderId()));
+        quoted.values().forEach(message -> senders.add(message.getSenderId()));
+        reactions.values().forEach(byEmoji -> byEmoji.values().forEach(tally -> senders.addAll(tally.recent)));
+        senders.remove(null);
+        Map<UUID, ChatDtos.Person> named = people.lookup(viewerId, senders);
+        List<Integer> withFiles = new ArrayList<>(messages.stream().map(ChatMessage::getId).toList());
+        withFiles.addAll(quoted.keySet());
+        Map<Integer, List<ChatAttachment>> files = attachmentRepository.findByMessageIdInOrderByIdAsc(withFiles).stream()
                 .collect(Collectors.groupingBy(ChatAttachment::getMessageId));
         List<ChatDtos.Message> views = new ArrayList<>(messages.size());
         for (ChatMessage message : messages) {
-            views.add(message(viewerId, message, named, files.getOrDefault(message.getId(), List.of())));
+            ChatMessage target = message.getReplyToMessageId() == null ? null : quoted.get(message.getReplyToMessageId());
+            ChatDtos.ReplyRef reply = target == null ? null : replyRef(target, named, files.getOrDefault(target.getId(), List.of()).size());
+            views.add(message(viewerId, message, named, files.getOrDefault(message.getId(), List.of()), reply,
+                    reactionViews(reactions.get(message.getId()), named)));
         }
         return views;
+    }
+
+    /** How many people reacted with one emoji, whether the viewer did, and the few who did most recently. */
+    private static final class Tally {
+        private long count;
+        private boolean mine;
+        private final Deque<UUID> recent = new ArrayDeque<>(REACTION_NAMES);
+    }
+
+    /** Reactions to the messages people can still see, by message and then emoji in the order first used. */
+    private Map<Integer, Map<String, Tally>> reactions(UUID viewerId, List<ChatMessage> messages) {
+        List<Integer> ids = messages.stream()
+                .filter(message -> message.getKind() == MessageKind.TEXT && message.getDeletedAt() == null && message.getHiddenAt() == null)
+                .map(ChatMessage::getId)
+                .toList();
+        Map<Integer, Map<String, Tally>> out = new HashMap<>();
+        if (ids.isEmpty()) {
+            return out;
+        }
+        jdbc.query("""
+                select message_id, user_id, emoji from chat_message_reactions
+                where message_id in (:ids) order by created_at, user_id
+                """, new MapSqlParameterSource("ids", ids), row -> {
+            UUID userId = row.getObject("user_id", UUID.class);
+            Tally tally = out.computeIfAbsent(row.getInt("message_id"), ignored -> new LinkedHashMap<>())
+                    .computeIfAbsent(row.getString("emoji"), ignored -> new Tally());
+            tally.count++;
+            tally.mine |= userId.equals(viewerId);
+            if (tally.recent.size() == REACTION_NAMES) {
+                tally.recent.removeFirst();
+            }
+            tally.recent.addLast(userId);
+        });
+        return out;
+    }
+
+    private static List<ChatDtos.Reaction> reactionViews(Map<String, Tally> byEmoji, Map<UUID, ChatDtos.Person> named) {
+        if (byEmoji == null) {
+            return List.of();
+        }
+        List<ChatDtos.Reaction> views = new ArrayList<>(byEmoji.size());
+        byEmoji.forEach((emoji, tally) -> {
+            List<ChatDtos.Person> recent = new ArrayList<>();
+            tally.recent.descendingIterator().forEachRemaining(userId -> {
+                ChatDtos.Person person = named.get(userId);
+                if (person != null) {
+                    recent.add(person);
+                }
+            });
+            views.add(new ChatDtos.Reaction(emoji, tally.count, tally.mine, recent));
+        });
+        return views;
+    }
+
+    private static ChatDtos.ReplyRef replyRef(ChatMessage target, Map<UUID, ChatDtos.Person> named, int attachments) {
+        boolean unavailable = target.getDeletedAt() != null || target.getHiddenAt() != null;
+        ChatDtos.Person sender = target.getSenderId() == null
+                ? new ChatDtos.Person(null, ChatPeople.DELETED_NAME, null, false)
+                : named.get(target.getSenderId());
+        return new ChatDtos.ReplyRef(target.getId(), sender, preview(target, attachments), unavailable);
     }
 
     public ChatDtos.Message message(UUID viewerId, ChatMessage message) {
@@ -116,6 +206,7 @@ public class ChatViews {
                 select count(*) from chat_messages m
                 where m.conversation_id = :conversationId and m.id > :cursor and m.kind = 'TEXT'
                   and m.deleted_at is null and m.hidden_at is null and m.sender_id is distinct from :userId
+                  and not exists (select 1 from chat_message_hidden_for h where h.message_id = m.id and h.user_id = :userId)
                 """, new MapSqlParameterSource("conversationId", conversationId)
                 .addValue("cursor", lastReadMessageId).addValue("userId", userId), Long.class);
         return count == null ? 0 : count;
@@ -131,6 +222,7 @@ public class ChatViews {
                 where p.user_id = :userId and p.left_at is null and not p.muted
                   and m.kind = 'TEXT' and m.deleted_at is null and m.hidden_at is null
                   and m.sender_id is distinct from :userId
+                  and not exists (select 1 from chat_message_hidden_for h where h.message_id = m.id and h.user_id = :userId)
                   and (cv.type not in ('COURSE', 'GROUP')
                        or exists (select 1 from users u, courses c where u.id = :userId and c.id = cv.course_id and %s))
                 """.formatted(ChatEligibility.ELIGIBLE_SQL), new MapSqlParameterSource("userId", userId), Long.class);
@@ -164,7 +256,7 @@ public class ChatViews {
     }
 
     private ChatDtos.Message message(UUID viewerId, ChatMessage message, Map<UUID, ChatDtos.Person> named,
-                                     List<ChatAttachment> files) {
+                                     List<ChatAttachment> files, ChatDtos.ReplyRef replyTo, List<ChatDtos.Reaction> reactions) {
         boolean deleted = message.getDeletedAt() != null;
         boolean hidden = message.getHiddenAt() != null;
         boolean visible = !deleted && !hidden;
@@ -178,7 +270,7 @@ public class ChatViews {
             sender = new ChatDtos.Person(null, ChatPeople.DELETED_NAME, null, false);
         }
         return new ChatDtos.Message(message.getId(), message.getConversationId(), lower(message.getKind()), sender,
-                visible ? message.getBody() : null, deleted, hidden, attachments,
+                visible ? message.getBody() : null, deleted, hidden, attachments, replyTo, visible ? reactions : List.of(),
                 mine ? message.getClientMessageId() : null, mine, message.getCreatedAt());
     }
 

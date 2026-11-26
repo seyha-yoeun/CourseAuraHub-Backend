@@ -39,7 +39,8 @@ public class ChatSocketController {
     public ChatDtos.Event send(@Payload ChatDtos.SocketSend command, Principal principal) {
         try {
             ChatDtos.Message message = chatService.send(actor(principal), command.conversationId(),
-                    new ChatDtos.SendMessageRequest(command.clientMessageId(), command.body(), command.attachmentIds()));
+                    new ChatDtos.SendMessageRequest(command.clientMessageId(), command.body(), command.attachmentIds(),
+                            command.replyToMessageId()));
             Map<String, Object> data = new HashMap<>();
             data.put("clientMessageId", command.clientMessageId());
             data.put("message", message);

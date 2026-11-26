@@ -48,6 +48,10 @@ public class ChatMessage {
     @Column(name = "kind", nullable = false, updatable = false, columnDefinition = "text")
     private MessageKind kind;
 
+    /** The earlier message in the same conversation this one replies to, if any. */
+    @Column(name = "reply_to_message_id", updatable = false)
+    private Integer replyToMessageId;
+
     @Column(name = "body", columnDefinition = "text")
     private String body;
 

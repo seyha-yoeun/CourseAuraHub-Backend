@@ -2276,6 +2276,21 @@ BEGIN
     ORDER BY m.id DESC LIMIT 1;
 END $seed$;
 
+-- A reply that quotes the message before it, and a message one participant deleted for themselves
+UPDATE chat_messages m
+SET reply_to_message_id = (SELECT p.id FROM chat_messages p
+                           WHERE p.conversation_id = m.conversation_id AND p.id < m.id AND p.kind = 'TEXT'
+                           ORDER BY p.id DESC LIMIT 1)
+WHERE m.id = (SELECT max(x.id) FROM chat_messages x JOIN chat_conversations c ON c.id = x.conversation_id
+              WHERE c.type = 'DIRECT' AND x.kind = 'TEXT' AND x.body IS NOT NULL AND x.deleted_at IS NULL);
+INSERT INTO chat_message_hidden_for (message_id, user_id, created_at)
+SELECT m.id, p.user_id, m.created_at + interval '1 hour'
+FROM chat_messages m
+JOIN chat_conversations c ON c.id = m.conversation_id AND c.type = 'DIRECT'
+JOIN chat_participants p ON p.conversation_id = m.conversation_id AND p.user_id <> m.sender_id
+WHERE m.kind = 'TEXT' AND m.body IS NOT NULL
+ORDER BY m.id LIMIT 1;
+
 -- ===============================================================================================================
 -- 20. Notifications, email preferences, browser push, Telegram
 -- ===============================================================================================================

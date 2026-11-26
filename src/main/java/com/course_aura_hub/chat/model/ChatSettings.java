@@ -31,4 +31,9 @@ public class ChatSettings {
     @Enumerated(EnumType.STRING)
     @Column(name = "direct_messages", nullable = false, columnDefinition = "text")
     private DirectMessagePolicy directMessages;
+
+    /** Direct contacts see when this user is active in chat */
+    @Builder.Default
+    @Column(name = "show_presence", nullable = false)
+    private boolean showPresence = true;
 }

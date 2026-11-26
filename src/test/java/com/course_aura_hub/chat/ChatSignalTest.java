@@ -19,6 +19,9 @@ class ChatSignalTest {
 
         ChatSignal sparse = ChatSignal.conversation(ChatSignal.Kind.TYPING, 3, actor, null);
         assertThat(ChatSignal.decode(sparse.encode())).isEqualTo(sparse);
+
+        ChatSignal presence = ChatSignal.presence(actor);
+        assertThat(ChatSignal.decode(presence.encode())).isEqualTo(presence);
     }
 
     @Test

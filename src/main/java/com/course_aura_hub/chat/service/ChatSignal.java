@@ -18,6 +18,8 @@ public record ChatSignal(Kind kind, Integer conversationId, Integer refId, UUID 
     public enum Kind {
         MESSAGE_CREATED("message.created"),
         MESSAGE_UPDATED("message.updated"),
+        /** A message one person deleted for themselves; only their own sessions hear about it. */
+        MESSAGE_REMOVED("message.removed"),
         READ("read"),
         DELIVERED("delivered"),
         TYPING("typing"),
@@ -28,7 +30,9 @@ public record ChatSignal(Kind kind, Integer conversationId, Integer refId, UUID 
         MEMBER_ROLE("member.role"),
         INVITE_RECEIVED("invite.received"),
         INVITE_REVOKED("invite.revoked"),
-        ACCESS_LOST("access.lost");
+        ACCESS_LOST("access.lost"),
+        /** Someone came online, went offline or changed who sees it; their direct contacts hear about it. */
+        PRESENCE("presence");
 
         private final String eventType;
 
@@ -51,6 +55,10 @@ public record ChatSignal(Kind kind, Integer conversationId, Integer refId, UUID 
 
     public static ChatSignal conversation(Kind kind, Integer conversationId, UUID actorId, UUID targetId) {
         return new ChatSignal(kind, conversationId, null, actorId, targetId, null);
+    }
+
+    public static ChatSignal presence(UUID userId) {
+        return new ChatSignal(Kind.PRESENCE, null, null, userId, null, null);
     }
 
     public static ChatSignal invite(Kind kind, Integer conversationId, Integer inviteId, UUID inviteeId) {

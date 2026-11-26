@@ -101,15 +101,20 @@ class ChatModerationPrivacyIntegrationTest extends ChatTestSupport {
         enroll(bo, slug);
         int conversation = openDirect(jane, bo);
         send(jane, conversation, "my words");
+        int theirs = send(bo, conversation, "your words");
+        mockMvc.perform(asJson(jane, put(CHAT + "/messages/" + theirs + "/reaction"), Map.of("emoji", "👍")))
+                .andExpect(status().isOk());
         int group = createGroup(jane, slug, bo);
         join(bo, group);
         mockMvc.perform(as(jane, put(CHAT + "/blocks/" + id(bo)))).andExpect(status().isOk());
+        UUID janeId = id(jane);
 
         mockMvc.perform(as(jane, get("/api/v1/me/data-export")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records.chatMessages[0].body").value("my words"))
                 .andExpect(jsonPath("$.data.records.chatMemberships", hasSize(2)))
-                .andExpect(jsonPath("$.data.records.chatBlocks[0].blockedUserId").value(id(bo).toString()));
+                .andExpect(jsonPath("$.data.records.chatBlocks[0].blockedUserId").value(id(bo).toString()))
+                .andExpect(jsonPath("$.data.records.chatReactions[0].emoji").value("👍"));
 
         mockMvc.perform(asJson(jane, post("/api/v1/me/account/deletion"), Map.of("password", PASSWORD, "confirmation", jane.email())))
                 .andExpect(status().isOk());
@@ -127,6 +132,8 @@ class ChatModerationPrivacyIntegrationTest extends ChatTestSupport {
         assertThat(jdbcTemplate.queryForObject("select count(*) from chat_blocks where blocked_id = ?", Integer.class, id(bo)))
                 .isZero();
         assertThat(jdbcTemplate.queryForObject("select count(*) from chat_messages where body = 'my words'", Integer.class))
+                .isZero();
+        assertThat(jdbcTemplate.queryForObject("select count(*) from chat_message_reactions where user_id = ?", Integer.class, janeId))
                 .isZero();
     }
 

@@ -322,6 +322,65 @@ class ChatMessagingIntegrationTest extends ChatTestSupport {
     }
 
     @Test
+    void replies_quoteAnEarlierMessage_andOnlyFromTheSameConversation() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        TestUser cy = registerUser();
+        enroll(jane, slug);
+        enroll(bo, slug);
+        enroll(cy, slug);
+        int conversation = openDirect(jane, bo);
+        int other = openDirect(jane, cy);
+        int question = send(jane, conversation, "Which lesson covers Git rebase?");
+        int elsewhere = send(jane, other, "hi cy");
+
+        mockMvc.perform(asJson(bo, post(CHAT + "/conversations/" + conversation + "/messages"),
+                        Map.of("clientMessageId", UUID.randomUUID(), "body", "Lesson 4", "replyToMessageId", question)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.replyTo.id").value(question))
+                .andExpect(jsonPath("$.data.replyTo.preview").value("Which lesson covers Git rebase?"))
+                .andExpect(jsonPath("$.data.replyTo.sender.name").value("Jane L."))
+                .andExpect(jsonPath("$.data.replyTo.unavailable").value(false));
+        mockMvc.perform(asJson(bo, post(CHAT + "/conversations/" + conversation + "/messages"),
+                        Map.of("clientMessageId", UUID.randomUUID(), "body", "sneaky", "replyToMessageId", elsewhere)))
+                .andExpect(status().isBadRequest());
+
+        // Unsending the original leaves the reply with an "unavailable" quote, never the old text
+        mockMvc.perform(as(jane, delete(CHAT + "/messages/" + question))).andExpect(status().isOk());
+        mockMvc.perform(as(bo, get(CHAT + "/conversations/" + conversation + "/messages")))
+                .andExpect(jsonPath("$.data.items[1].replyTo.unavailable").value(true))
+                .andExpect(jsonPath("$.data.items[1].replyTo.preview").value("Message deleted"));
+    }
+
+    @Test
+    void deleteForMe_removesAMessageFromMyViewOnly() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        enroll(jane, slug);
+        enroll(bo, slug);
+        int conversation = openDirect(jane, bo);
+        send(jane, conversation, "keep this");
+        int unwanted = send(jane, conversation, "forget this");
+        mockMvc.perform(as(bo, get(CHAT + "/unread-count"))).andExpect(jsonPath("$.data.total").value(2));
+
+        mockMvc.perform(as(bo, delete(CHAT + "/messages/" + unwanted + "/for-me"))).andExpect(status().isOk());
+        mockMvc.perform(as(bo, delete(CHAT + "/messages/" + unwanted + "/for-me"))).andExpect(status().isOk());
+        mockMvc.perform(as(bo, get(CHAT + "/conversations/" + conversation + "/messages")))
+                .andExpect(jsonPath("$.data.items", hasSize(1)))
+                .andExpect(jsonPath("$.data.items[0].body").value("keep this"));
+        mockMvc.perform(as(bo, get(CHAT + "/unread-count"))).andExpect(jsonPath("$.data.total").value(1));
+        mockMvc.perform(as(bo, get(CHAT + "/conversations/" + conversation)))
+                .andExpect(jsonPath("$.data.lastMessage.preview").value("keep this"));
+
+        // Jane still has both; an outsider can't touch it
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + conversation + "/messages")))
+                .andExpect(jsonPath("$.data.items", hasSize(2)));
+        mockMvc.perform(as(registerUser(), delete(CHAT + "/messages/" + unwanted + "/for-me"))).andExpect(status().isNotFound());
+    }
+
+    @Test
     void socketTicket_isIssuedToSignedInUsers() throws Exception {
         mockMvc.perform(as(registerUser(), post(CHAT + "/socket-ticket")))
                 .andExpect(status().isCreated())
@@ -356,6 +415,151 @@ class ChatMessagingIntegrationTest extends ChatTestSupport {
         }
         mockMvc.perform(asJson(jane, post(CHAT + "/conversations/" + conversation + "/messages"),
                 Map.of("clientMessageId", UUID.randomUUID(), "body", "   "))).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void reactions_onePerPerson_replacedOrRemoved_andOnlyOnLiveMessages() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        TestUser cy = registerUser();
+        rename(bo, "Bo", "Kim");
+        enroll(jane, slug);
+        enroll(bo, slug);
+        enroll(cy, slug);
+        int conversation = openDirect(jane, bo);
+        int message = send(jane, conversation, "Finished lesson 5!");
+        String reaction = CHAT + "/messages/" + message + "/reaction";
+
+        mockMvc.perform(asJson(bo, put(reaction), Map.of("emoji", "🎉")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reactions", hasSize(1)))
+                .andExpect(jsonPath("$.data.reactions[0].emoji").value("🎉"))
+                .andExpect(jsonPath("$.data.reactions[0].count").value(1))
+                .andExpect(jsonPath("$.data.reactions[0].mine").value(true));
+        mockMvc.perform(asJson(jane, put(reaction), Map.of("emoji", "🎉"))).andExpect(status().isOk());
+        // Each viewer sees the count, whether they're in it, and who reacted (newest first, by short name)
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + conversation + "/messages")))
+                .andExpect(jsonPath("$.data.items[0].reactions[0].count").value(2))
+                .andExpect(jsonPath("$.data.items[0].reactions[0].mine").value(true))
+                .andExpect(jsonPath("$.data.items[0].reactions[0].people", hasSize(2)))
+                .andExpect(jsonPath("$.data.items[0].reactions[0].people[1].name").value("Bo K."))
+                .andExpect(jsonPath("$..email").doesNotExist());
+
+        // Another emoji replaces mine; the reactions stay in the order they were first used
+        mockMvc.perform(asJson(bo, put(reaction), Map.of("emoji", "❤️")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reactions", hasSize(2)))
+                .andExpect(jsonPath("$.data.reactions[0].emoji").value("🎉"))
+                .andExpect(jsonPath("$.data.reactions[0].count").value(1))
+                .andExpect(jsonPath("$.data.reactions[0].mine").value(false))
+                .andExpect(jsonPath("$.data.reactions[1].emoji").value("❤️"))
+                .andExpect(jsonPath("$.data.reactions[1].mine").value(true));
+        mockMvc.perform(as(bo, delete(reaction)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reactions", hasSize(1)));
+        mockMvc.perform(as(bo, delete(reaction))).andExpect(status().isOk());
+
+        // Only the offered emoji, and only from the conversation's members
+        mockMvc.perform(asJson(bo, put(reaction), Map.of("emoji", "🍕"))).andExpect(status().isBadRequest());
+        mockMvc.perform(asJson(bo, put(reaction), Map.of("emoji", ""))).andExpect(status().isBadRequest());
+        mockMvc.perform(asJson(cy, put(reaction), Map.of("emoji", "👍"))).andExpect(status().isNotFound());
+        mockMvc.perform(as(cy, delete(reaction))).andExpect(status().isNotFound());
+
+        // An unsent message shows no reactions and takes no new ones
+        mockMvc.perform(as(jane, delete(CHAT + "/messages/" + message))).andExpect(status().isOk());
+        mockMvc.perform(as(bo, get(CHAT + "/conversations/" + conversation + "/messages")))
+                .andExpect(jsonPath("$.data.items[0].reactions", hasSize(0)));
+        mockMvc.perform(asJson(bo, put(reaction), Map.of("emoji", "👍"))).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void reactions_needTheMessageInMyView_andStopWhenBlocked() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        enroll(jane, slug);
+        enroll(bo, slug);
+        int conversation = openDirect(jane, bo);
+        int removed = send(jane, conversation, "forget this");
+        int kept = send(jane, conversation, "keep this");
+
+        mockMvc.perform(as(bo, delete(CHAT + "/messages/" + removed + "/for-me"))).andExpect(status().isOk());
+        mockMvc.perform(asJson(bo, put(CHAT + "/messages/" + removed + "/reaction"), Map.of("emoji", "👍")))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(asJson(bo, put(CHAT + "/messages/" + kept + "/reaction"), Map.of("emoji", "👍"))).andExpect(status().isOk());
+        mockMvc.perform(as(jane, put(CHAT + "/blocks/" + id(bo)))).andExpect(status().isOk());
+        mockMvc.perform(asJson(bo, put(CHAT + "/messages/" + kept + "/reaction"), Map.of("emoji", "😂")))
+                .andExpect(status().isForbidden());
+        // Taking a reaction back still works
+        mockMvc.perform(as(bo, delete(CHAT + "/messages/" + kept + "/reaction")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reactions", hasSize(0)));
+    }
+
+    @Test
+    void peerPresence_defaultsToShown_andIsHiddenAcrossABlock() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        enroll(jane, slug);
+        enroll(bo, slug);
+        int conversation = openDirect(jane, bo);
+
+        mockMvc.perform(as(bo, get(CHAT + "/settings")))
+                .andExpect(jsonPath("$.data.showPresence").value(true));
+        // Never connected: offline, with no last-seen time
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + conversation)))
+                .andExpect(jsonPath("$.data.peerPresence.online").value(false))
+                .andExpect(jsonPath("$.data.peerPresence.lastSeenAt").doesNotExist());
+
+        mockMvc.perform(as(bo, put(CHAT + "/blocks/" + id(jane)))).andExpect(status().isOk());
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + conversation)))
+                .andExpect(jsonPath("$.data.peerPresence").doesNotExist());
+        mockMvc.perform(as(bo, get(CHAT + "/conversations/" + conversation)))
+                .andExpect(jsonPath("$.data.peerPresence").doesNotExist());
+    }
+
+    @Test
+    void hiddenConversations_areListedApart_andComeBackWhenUnhiddenOrWrittenIn() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        TestUser cy = registerUser();
+        enroll(jane, slug);
+        enroll(bo, slug);
+        enroll(cy, slug);
+        int withBo = openDirect(jane, bo);
+        int withCy = openDirect(jane, cy);
+        send(bo, withBo, "hi jane");
+        send(cy, withCy, "hey");
+
+        mockMvc.perform(asJson(jane, patch(CHAT + "/conversations/" + withBo), Map.of("hidden", true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hidden").value(true));
+        mockMvc.perform(as(jane, get(CHAT + "/conversations")))
+                .andExpect(jsonPath("$.data.items[?(@.id == " + withBo + ")]").isEmpty())
+                .andExpect(jsonPath("$.data.items[0].hidden").value(false));
+        mockMvc.perform(as(jane, get(CHAT + "/conversations?hidden=true")))
+                .andExpect(jsonPath("$.data.items", hasSize(1)))
+                .andExpect(jsonPath("$.data.items[0].id").value(withBo))
+                .andExpect(jsonPath("$.data.items[0].hidden").value(true));
+
+        // Unhiding puts it straight back
+        mockMvc.perform(asJson(jane, patch(CHAT + "/conversations/" + withBo), Map.of("hidden", false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hidden").value(false));
+        mockMvc.perform(as(jane, get(CHAT + "/conversations?hidden=true")))
+                .andExpect(jsonPath("$.data.items", hasSize(0)));
+
+        // So does a new message
+        mockMvc.perform(asJson(jane, patch(CHAT + "/conversations/" + withCy), Map.of("hidden", true))).andExpect(status().isOk());
+        send(cy, withCy, "still there?");
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + withCy)))
+                .andExpect(jsonPath("$.data.hidden").value(false));
+        mockMvc.perform(as(jane, get(CHAT + "/conversations?hidden=true")))
+                .andExpect(jsonPath("$.data.items", hasSize(0)));
     }
 
     /** A finished upload, as FileService leaves it after completeUpload. */

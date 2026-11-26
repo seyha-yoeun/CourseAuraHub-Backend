@@ -30,7 +30,10 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Real WebSocket connections: STOMP needs a running server, which MockMvc doesn't provide. */
@@ -214,6 +217,43 @@ class ChatSocketIntegrationTest extends ChatTestSupport {
         send(owner, group, "after cy left");
         nextMessage(boSocket, "after cy left");
         assertThat(receivesWithin(cySocket, "message.created", 1_500)).isFalse();
+    }
+
+    @Test
+    void presence_reachesDirectContactsOnly_andFollowsTheSetting() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        TestUser cy = registerUser();
+        for (TestUser user : List.of(jane, bo, cy)) {
+            enroll(user, slug);
+        }
+        int conversation = openDirect(jane, bo);
+        Connection janeSocket = listen(jane);
+        Connection cySocket = listen(cy);
+
+        Connection boSocket = listen(bo);
+        Map<String, Object> online = next(janeSocket, "presence");
+        assertThat(online.get("userId")).isEqualTo(id(bo).toString());
+        assertThat(((Map<?, ?>) online.get("presence")).get("online")).isEqualTo(true);
+        // Cy shares no direct conversation with Bo
+        assertThat(receivesWithin(cySocket, "presence", 1_000)).isFalse();
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + conversation)))
+                .andExpect(jsonPath("$.data.peerPresence.online").value(true));
+
+        // Offline once the grace period after the last session has passed
+        boSocket.session().disconnect();
+        Map<?, ?> offline = (Map<?, ?>) next(janeSocket, "presence").get("presence");
+        assertThat(offline.get("online")).isEqualTo(false);
+        assertThat(offline.get("lastSeenAt")).isNotNull();
+
+        // Hiding it: contacts hear the status is gone, and the conversation stops showing it
+        mockMvc.perform(asJson(bo, put(CHAT + "/settings"), Map.of("directMessages", "course_members", "showPresence", false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.showPresence").value(false));
+        assertThat(next(janeSocket, "presence").get("presence")).isNull();
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + conversation)))
+                .andExpect(jsonPath("$.data.peerPresence").doesNotExist());
     }
 
     @Test

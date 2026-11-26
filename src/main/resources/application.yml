@@ -292,12 +292,17 @@ app:
     max-attachments: ${CHAT_MAX_ATTACHMENTS:5}
     # Spam limits per user (skipped when app.rate-limit.enabled is false)
     messages-per-minute: ${CHAT_MESSAGES_PER_MINUTE:30}
+    reactions-per-minute: ${CHAT_REACTIONS_PER_MINUTE:60}
     directs-per-day: ${CHAT_DIRECTS_PER_DAY:20}
     groups-per-day: ${CHAT_GROUPS_PER_DAY:5}
     invites-per-day: ${CHAT_INVITES_PER_DAY:50}
     directory-queries-per-minute: ${CHAT_DIRECTORY_QUERIES_PER_MINUTE:60}
     # Expires invites and takes members who lost course access out of their groups
     maintenance-cron: ${CHAT_MAINTENANCE_CRON:0 7 * * * *}
+    # Presence ("Active now"): each instance refreshes its users this often (ISO-8601, also read by @Scheduled);
+    # someone shows offline this long after their last session closes, which covers the forced reconnect
+    presence-heartbeat: ${CHAT_PRESENCE_HEARTBEAT:PT30S}
+    presence-grace: ${CHAT_PRESENCE_GRACE:PT20S}
 
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}

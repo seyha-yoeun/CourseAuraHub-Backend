@@ -7,16 +7,21 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
-/** Hourly group clean-up on one instance at a time; the work is in {@link ChatGroupService#runMaintenance()}. */
+/**
+ * Hourly clean-up on one instance at a time: groups ({@link ChatGroupService#runMaintenance()}) and presence rows
+ * left by stopped instances ({@link ChatPresence#prune()}).
+ */
 @Component
 @RequiredArgsConstructor
 public class ChatMaintenanceJob {
 
     private final ChatGroupService groupService;
+    private final ChatPresence presence;
     private final ClusterJobLock jobLock;
 
     @Scheduled(cron = "${app.chat.maintenance-cron:0 7 * * * *}")
     public void run() {
         jobLock.runExclusively("chat-group-maintenance", Duration.ofMinutes(30), Duration.ofMinutes(1), groupService::runMaintenance);
+        jobLock.runExclusively("chat-presence-prune", Duration.ofMinutes(5), Duration.ofMinutes(1), presence::prune);
     }
 }

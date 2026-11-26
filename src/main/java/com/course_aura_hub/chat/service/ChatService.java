@@ -12,7 +12,11 @@ public interface ChatService {
     ChatDtos.SocketTicket issueSocketTicket(Actor actor);
 
     /** My conversations, most recent activity first. {@code cursor} is the previous page's {@code nextCursor}. */
-    ChatDtos.ConversationPage conversations(Actor actor, String cursor, int limit);
+    /**
+     * My conversations, newest activity first. {@code hidden} lists instead the ones I hid from my list; a
+     * conversation hidden that gets a new message is back in the main list.
+     */
+    ChatDtos.ConversationPage conversations(Actor actor, String cursor, int limit, boolean hidden);
 
     ChatDtos.UnreadCount unreadCount(Actor actor);
 
@@ -46,8 +50,17 @@ public interface ChatService {
     /** Tells the others I'm typing; nothing is stored. */
     void typing(Actor actor, Integer conversationId);
 
-    /** Deletes my own message within the delete window. */
+    /** Unsends my own message for everyone, within the delete window. */
     ChatDtos.Message deleteMessage(Actor actor, Integer messageId);
+
+    /** Removes a message from my own view only; everyone else still sees it. Works on any message I can read. */
+    void deleteForMe(Actor actor, Integer messageId);
+
+    /** Reacts to a message with one of {@link ChatReactions#ALLOWED}, replacing my earlier reaction to it. */
+    ChatDtos.Message react(Actor actor, Integer messageId, String emoji);
+
+    /** Takes my reaction off a message, if I had one. */
+    ChatDtos.Message unreact(Actor actor, Integer messageId);
 
     /** Hides a message: group owners and admins in their group, course staff in their course channel. */
     ChatDtos.Message hideMessage(Actor actor, Integer messageId);

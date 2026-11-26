@@ -44,6 +44,8 @@ public abstract class IntegrationTestBase {
         registry.add("app.rate-limit.enabled", () -> "false");
         registry.add("app.security.auth.mfa.encryption-key", () -> TEST_MFA_KEY);
         registry.add("app.cors.allowed-origins", () -> "http://localhost:3000");
+        // Chat presence: show someone offline a second after their last session closes, so tests needn't wait
+        registry.add("app.chat.presence-grace", () -> "PT1S");
     }
 
     @BeforeEach

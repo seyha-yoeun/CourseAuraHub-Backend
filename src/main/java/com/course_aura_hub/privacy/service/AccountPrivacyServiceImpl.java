@@ -291,10 +291,17 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                        case when invitee_id = :userId then 'received' else 'sent' end as direction,
                        created_at as "createdAt", responded_at as "respondedAt"
                 from chat_group_invites where invitee_id = :userId or inviter_id = :userId order by created_at""");
+        queries.put("chatMessagesDeletedForMe", "select message_id as \"messageId\", created_at as \"deletedAt\" "
+                + "from chat_message_hidden_for where user_id = :userId order by created_at");
+        queries.put("chatReactions", "select message_id as \"messageId\", emoji, created_at as \"reactedAt\" "
+                + "from chat_message_reactions where user_id = :userId order by created_at");
         queries.put("chatBlocks", """
                 select blocked_id as "blockedUserId", created_at as "blockedAt" from chat_blocks where blocker_id = :userId""");
         queries.put("chatSettings", """
-                select lower(direct_messages) as "directMessages" from chat_settings where user_id = :userId""");
+                select lower(direct_messages) as "directMessages", show_presence as "showPresence"
+                from chat_settings where user_id = :userId""");
+        queries.put("chatPresence", """
+                select max(seen_at) as "lastSeenAt" from chat_presence where user_id = :userId having count(*) > 0""");
         return queries;
     }
 }

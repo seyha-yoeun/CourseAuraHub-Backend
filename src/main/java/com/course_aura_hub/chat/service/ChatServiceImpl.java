@@ -36,7 +36,6 @@ import com.course_aura_hub.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -66,6 +65,10 @@ public class ChatServiceImpl implements ChatService {
     static final int MAX_PAGE = 50;
     static final String CANT_START_DIRECT = "You can't start a conversation with this person";
     private static final String TOO_FAST = "You're sending messages too quickly. Wait a moment and try again.";
+    // Hidden from my list until a message arrives after I hid it (ChatViews.isHidden says the same per conversation)
+    private static final String SHOWN_SQL = "(p.hidden_at is null or cv.last_activity_at > p.hidden_at)";
+    private static final String HIDDEN_SQL = "(p.hidden_at is not null and cv.last_activity_at <= p.hidden_at)";
+    private static final String TOO_MANY_REACTIONS = "You're reacting too quickly. Wait a moment and try again.";
 
     private final ChatConversationRepository conversationRepository;
     private final ChatParticipantRepository participantRepository;
@@ -95,7 +98,7 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional(readOnly = true)
-    public ChatDtos.ConversationPage conversations(Actor actor, String cursor, int limit) {
+    public ChatDtos.ConversationPage conversations(Actor actor, String cursor, int limit, boolean hidden) {
         int size = clamp(limit, 20);
         MapSqlParameterSource params = new MapSqlParameterSource("me", actor.userId()).addValue("limit", size + 1);
         String after = "";
@@ -113,13 +116,13 @@ public class ChatServiceImpl implements ChatService {
                 from chat_participants p
                 join chat_conversations cv on cv.id = p.conversation_id
                 where p.user_id = :me and p.left_at is null
-                  and (p.hidden_at is null or cv.last_activity_at > p.hidden_at)
+                  and %s
                   and (cv.type not in ('COURSE', 'GROUP')
                        or exists (select 1 from users u, courses c where u.id = :me and c.id = cv.course_id and %s))
                   %s
                 order by cv.last_activity_at desc, cv.id desc
                 limit :limit
-                """.formatted(ChatEligibility.ELIGIBLE_SQL, after), params, Integer.class);
+                """.formatted(hidden ? HIDDEN_SQL : SHOWN_SQL, ChatEligibility.ELIGIBLE_SQL, after), params, Integer.class);
         boolean more = ids.size() > size;
         List<ChatDtos.Conversation> items = new ArrayList<>();
         for (Integer id : more ? ids.subList(0, size) : ids) {
@@ -241,11 +244,13 @@ public class ChatServiceImpl implements ChatService {
         }
         participantRepository.saveAndFlush(participant);
         if (request.hidden() != null) {
-            // The database clock, so it compares exactly with message times
-            jdbc.update("update chat_participants set hidden_at = case when :hidden then now() end "
-                            + "where conversation_id = :id and user_id = :userId",
+            // The database clock, so it compares exactly with message times; the loaded row learns the same value,
+            // so the response already says whether it's hidden
+            Timestamp hiddenAt = jdbc.queryForObject("update chat_participants set hidden_at = case when :hidden then now() end "
+                            + "where conversation_id = :id and user_id = :userId returning hidden_at",
                     new MapSqlParameterSource("hidden", request.hidden()).addValue("id", conversationId)
-                            .addValue("userId", actor.userId()));
+                            .addValue("userId", actor.userId()), Timestamp.class);
+            participant.setHiddenAt(hiddenAt == null ? null : hiddenAt.toInstant());
         }
         return views.conversation(actor.userId(), actor.admin(), access.requireReadable(actor, conversationId));
     }
@@ -255,14 +260,15 @@ public class ChatServiceImpl implements ChatService {
     public ChatDtos.MessagePage messages(Actor actor, Integer conversationId, Integer before, Integer after, int limit) {
         access.requireReadable(actor, conversationId);
         int size = clamp(limit, MAX_PAGE);
-        PageRequest page = PageRequest.of(0, size + 1);
+        UUID me = actor.userId();
+        // Messages I deleted for myself are left out of my history
         List<ChatMessage> found;
         if (after != null) {
-            found = messageRepository.findByConversationIdAndIdGreaterThanOrderByIdAsc(conversationId, after, page);
+            found = messageRepository.findVisibleAfter(conversationId, after, me, size + 1);
         } else {
             found = before == null
-                    ? messageRepository.findByConversationIdOrderByIdDesc(conversationId, page)
-                    : messageRepository.findByConversationIdAndIdLessThanOrderByIdDesc(conversationId, before, page);
+                    ? messageRepository.findLatestVisible(conversationId, me, size + 1)
+                    : messageRepository.findVisibleBefore(conversationId, before, me, size + 1);
         }
         boolean more = found.size() > size;
         List<ChatMessage> pageItems = new ArrayList<>(more ? found.subList(0, size) : found);
@@ -297,6 +303,12 @@ public class ChatServiceImpl implements ChatService {
         }
         ChatAccess.View view = access.requireWritable(actor, conversationId);
         rateLimiter.check("chat-message", me, properties.messagesPerMinute(), TOO_FAST);
+        Integer replyTo = request.replyToMessageId();
+        if (replyTo != null && messageRepository.findById(replyTo)
+                .filter(target -> target.getConversationId().equals(conversationId) && target.getKind() == MessageKind.TEXT)
+                .isEmpty()) {
+            throw new BusinessRuleException("You can only reply to a message in this conversation");
+        }
         List<StoredFileResponse> files = new ArrayList<>();
         for (UUID fileId : fileIds) {
             StoredFileResponse file = fileService.requireOwnedFile(fileId, me, FilePurpose.CHAT_ATTACHMENT);
@@ -307,12 +319,12 @@ public class ChatServiceImpl implements ChatService {
         }
 
         List<Integer> inserted = jdbc.queryForList("""
-                insert into chat_messages (conversation_id, sender_id, client_message_id, kind, body, created_at)
-                values (:conversationId, :me, :clientId, 'TEXT', :body, now())
+                insert into chat_messages (conversation_id, sender_id, client_message_id, kind, body, reply_to_message_id, created_at)
+                values (:conversationId, :me, :clientId, 'TEXT', :body, :replyTo, now())
                 on conflict (sender_id, client_message_id) where client_message_id is not null do nothing
                 returning id
                 """, new MapSqlParameterSource("conversationId", conversationId).addValue("me", me)
-                .addValue("clientId", request.clientMessageId()).addValue("body", body), Integer.class);
+                .addValue("clientId", request.clientMessageId()).addValue("body", body).addValue("replyTo", replyTo), Integer.class);
         if (inserted.isEmpty()) {
             // A concurrent retry of the same send won the race
             ChatMessage winner = messageRepository.findBySenderIdAndClientMessageId(me, request.clientMessageId())
@@ -413,6 +425,69 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
+    public void deleteForMe(Actor actor, Integer messageId) {
+        ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
+        access.requireReadable(actor, message.getConversationId());
+        if (message.getKind() != MessageKind.TEXT) {
+            throw new BusinessRuleException("Only messages people wrote can be deleted");
+        }
+        int added = jdbc.update(
+                "insert into chat_message_hidden_for (message_id, user_id, created_at) values (:messageId, :me, now()) on conflict do nothing",
+                new MapSqlParameterSource("messageId", messageId).addValue("me", actor.userId()));
+        if (added > 0) {
+            // My other tabs and devices drop it too
+            events.publishEvent(new ChatSignal(ChatSignal.Kind.MESSAGE_REMOVED, message.getConversationId(), messageId,
+                    actor.userId(), actor.userId(), null));
+        }
+    }
+
+    @Override
+    @Transactional
+    public ChatDtos.Message react(Actor actor, Integer messageId, String emoji) {
+        UUID me = actor.userId();
+        ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
+        // Reacting is taking part, like sending: blocked, archived, closed and restricted conversations refuse it.
+        // This also locks the conversation row first, in the order sends use.
+        access.requireWritable(actor, message.getConversationId());
+        if (hiddenFor(messageId, me)) {
+            throw ResourceNotFoundException.of("Message", messageId);
+        }
+        if (message.getKind() != MessageKind.TEXT || message.getDeletedAt() != null || message.getHiddenAt() != null) {
+            throw new BusinessRuleException("You can't react to this message");
+        }
+        String chosen = ChatReactions.normalize(emoji);
+        if (chosen == null) {
+            throw new BusinessRuleException("Choose one of the offered reactions");
+        }
+        rateLimiter.check("chat-reaction", me, properties.reactionsPerMinute(), TOO_MANY_REACTIONS);
+        int changed = jdbc.update("""
+                insert into chat_message_reactions (message_id, user_id, emoji, created_at)
+                values (:messageId, :me, :emoji, now())
+                on conflict (message_id, user_id) do update set emoji = excluded.emoji, created_at = excluded.created_at
+                where chat_message_reactions.emoji is distinct from excluded.emoji
+                """, new MapSqlParameterSource("messageId", messageId).addValue("me", me).addValue("emoji", chosen));
+        if (changed > 0) {
+            events.publishEvent(ChatSignal.message(ChatSignal.Kind.MESSAGE_UPDATED, message.getConversationId(), messageId, me));
+        }
+        return views.message(me, message);
+    }
+
+    @Override
+    @Transactional
+    public ChatDtos.Message unreact(Actor actor, Integer messageId) {
+        UUID me = actor.userId();
+        ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
+        access.requireReadable(actor, message.getConversationId());
+        int removed = jdbc.update("delete from chat_message_reactions where message_id = :messageId and user_id = :me",
+                new MapSqlParameterSource("messageId", messageId).addValue("me", me));
+        if (removed > 0) {
+            events.publishEvent(ChatSignal.message(ChatSignal.Kind.MESSAGE_UPDATED, message.getConversationId(), messageId, me));
+        }
+        return views.message(me, message);
+    }
+
+    @Override
+    @Transactional
     public ChatDtos.Message hideMessage(Actor actor, Integer messageId) {
         ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
         ChatAccess.View view = access.requireReadable(actor, message.getConversationId());
@@ -500,7 +575,8 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional(readOnly = true)
     public ChatDtos.Settings settings(Actor actor) {
-        return new ChatDtos.Settings(ChatViews.lower(policyOf(actor.userId())));
+        ChatSettings settings = settingsOf(actor.userId());
+        return new ChatDtos.Settings(ChatViews.lower(settings.getDirectMessages()), settings.isShowPresence());
     }
 
     @Override
@@ -512,8 +588,26 @@ public class ChatServiceImpl implements ChatService {
         } catch (IllegalArgumentException ex) {
             throw new BusinessRuleException("Choose course_members, staff_only or nobody");
         }
-        settingsRepository.save(ChatSettings.builder().userId(actor.userId()).directMessages(policy).build());
-        return new ChatDtos.Settings(ChatViews.lower(policy));
+        ChatSettings settings = settingsOf(actor.userId());
+        boolean presenceChanged = request.showPresence() != null && request.showPresence() != settings.isShowPresence();
+        settings.setDirectMessages(policy);
+        if (request.showPresence() != null) {
+            settings.setShowPresence(request.showPresence());
+        }
+        settingsRepository.save(settings);
+        if (presenceChanged) {
+            // Contacts start or stop seeing my status
+            events.publishEvent(ChatSignal.presence(actor.userId()));
+        }
+        return new ChatDtos.Settings(ChatViews.lower(policy), settings.isShowPresence());
+    }
+
+    /** The user's saved settings, or the defaults for someone who never changed them. */
+    private ChatSettings settingsOf(UUID userId) {
+        return settingsRepository.findById(userId).orElseGet(() -> ChatSettings.builder()
+                .userId(userId)
+                .directMessages(DirectMessagePolicy.COURSE_MEMBERS)
+                .build());
     }
 
     @Override
@@ -569,6 +663,9 @@ public class ChatServiceImpl implements ChatService {
         jdbc.update("update chat_conversations set status = 'CLOSED' where type = 'SUPPORT' and created_by = :userId and status = 'OPEN'",
                 params);
         jdbc.update("delete from chat_blocks where blocker_id = :userId or blocked_id = :userId", params);
+        jdbc.update("delete from chat_message_hidden_for where user_id = :userId", params);
+        jdbc.update("delete from chat_message_reactions where user_id = :userId", params);
+        jdbc.update("delete from chat_presence where user_id = :userId", params);
         jdbc.update("delete from chat_settings where user_id = :userId", params);
         jdbc.update("delete from chat_restrictions where user_id = :userId", params);
         log.info("Erased chat data of deleted account {}", userId);
@@ -581,6 +678,12 @@ public class ChatServiceImpl implements ChatService {
             return false;
         }
         return policyOf(other) == DirectMessagePolicy.COURSE_MEMBERS || eligibility.isStaffOfSharedCourse(me, other);
+    }
+
+    private boolean hiddenFor(Integer messageId, UUID userId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "select exists (select 1 from chat_message_hidden_for where message_id = :messageId and user_id = :userId)",
+                new MapSqlParameterSource("messageId", messageId).addValue("userId", userId), Boolean.class));
     }
 
     private DirectMessagePolicy policyOf(UUID userId) {
