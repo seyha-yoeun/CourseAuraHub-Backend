@@ -30,6 +30,7 @@ public class OneTimeTokenService {
 
     private static final int OPAQUE_TOKEN_BYTES = 32;
     private static final Duration TELEGRAM_LINK_TTL = Duration.ofMinutes(10);
+    private static final Duration CHAT_SOCKET_TTL = Duration.ofSeconds(60);
 
     private final OneTimeTokenRepository repository;
     private final TokenHasher tokenHasher;
@@ -52,6 +53,7 @@ public class OneTimeTokenService {
     public Policy policyFor(TokenPurpose purpose) {
         return switch (purpose) {
             case TELEGRAM_LINK -> new Policy(0, TELEGRAM_LINK_TTL, 1, Duration.ZERO, Integer.MAX_VALUE);
+            case CHAT_SOCKET -> new Policy(0, CHAT_SOCKET_TTL, 1, Duration.ZERO, Integer.MAX_VALUE);
             case EMAIL_VERIFICATION -> {
                 AuthSecurityProperties.EmailVerification p = properties.emailVerification();
                 yield new Policy(p.codeLength(), p.codeTtl(), p.maxAttempts(), p.resendCooldown(), p.maxCodesPerHour());

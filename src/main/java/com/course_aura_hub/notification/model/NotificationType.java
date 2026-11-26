@@ -17,6 +17,7 @@ public enum NotificationType {
     MEMBER_CARD,
     PAYOUT,
     LESSON_QUESTION,
+    CHAT_MESSAGE,
     ASSIGNMENT,
     COURSE_REVIEW,
     COURSE_SURVEY,

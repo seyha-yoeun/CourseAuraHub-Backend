@@ -279,6 +279,26 @@ app:
       digest-cron: ${NOTIFICATION_DIGEST_CRON:0 0 18 * * *}
       digest-max-items: ${NOTIFICATION_DIGEST_MAX_ITEMS:20}
 
+  chat:
+    # WebSocket sessions close after this long; the client gets a new ticket and reconnects (re-checks the account)
+    socket-session-lifetime: ${CHAT_SOCKET_SESSION_LIFETIME:15m}
+    heartbeat: ${CHAT_HEARTBEAT:10s}
+    max-frame-bytes: ${CHAT_MAX_FRAME_BYTES:65536}
+    # Relay live chat events to other instances over Postgres LISTEN/NOTIFY (shares the notification listener's connection)
+    cluster-fanout: ${CHAT_CLUSTER_FANOUT:true}
+    group-member-limit: ${CHAT_GROUP_MEMBER_LIMIT:100}
+    invite-ttl: ${CHAT_INVITE_TTL:7d}
+    delete-window: ${CHAT_DELETE_WINDOW:15m}
+    max-attachments: ${CHAT_MAX_ATTACHMENTS:5}
+    # Spam limits per user (skipped when app.rate-limit.enabled is false)
+    messages-per-minute: ${CHAT_MESSAGES_PER_MINUTE:30}
+    directs-per-day: ${CHAT_DIRECTS_PER_DAY:20}
+    groups-per-day: ${CHAT_GROUPS_PER_DAY:5}
+    invites-per-day: ${CHAT_INVITES_PER_DAY:50}
+    directory-queries-per-minute: ${CHAT_DIRECTORY_QUERIES_PER_MINUTE:60}
+    # Expires invites and takes members who lost course access out of their groups
+    maintenance-cron: ${CHAT_MAINTENANCE_CRON:0 7 * * * *}
+
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
     # Upper bound on tracked client/endpoint buckets (LRU eviction)

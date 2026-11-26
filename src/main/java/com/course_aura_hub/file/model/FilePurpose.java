@@ -12,6 +12,8 @@ public enum FilePurpose {
     // Lesson files stay private: paid content is only reachable through a short-lived signed link
     LESSON_CONTENT("private/lessons", 2048 * FilePurpose.MB, true, Set.of(FileType.MP4, FileType.WEBM, FileType.PDF)),
     ASSIGNMENT_SUBMISSION("private/assignments", 25 * FilePurpose.MB, false, Set.of(FileType.PDF, FileType.JPEG, FileType.PNG)),
+    // Files sent in chat: private, signed per read for people who can read the message
+    CHAT_ATTACHMENT("private/chat", 25 * FilePurpose.MB, false, Set.of(FileType.JPEG, FileType.PNG, FileType.WEBP, FileType.PDF)),
     TOP_UP_RECEIPT("private/receipts", 10 * FilePurpose.MB, false, Set.of(FileType.PDF, FileType.JPEG, FileType.PNG, FileType.WEBP)),
     // Captions follow their lesson: private, signed only for learners who can watch it
     LESSON_CAPTION("private/captions", 2 * FilePurpose.MB, true, Set.of(FileType.VTT));

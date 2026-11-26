@@ -89,6 +89,8 @@ public class SecurityConfig {
                         .ignoringRequestMatchers("/api/v1/notifications/unsubscribe")
                         // Anonymous catalog analytics, sent with navigator.sendBeacon; it changes nothing a user owns
                         .ignoringRequestMatchers("/api/v1/events")
+                        // Chat WebSocket handshake (a GET); authorised by its single-use ticket
+                        .ignoringRequestMatchers("/ws/chat", "/ws/chat/**")
                         .ignoringRequestMatchers(bearerOnlyRequest())
                 )
                 .cors(Customizer.withDefaults())
@@ -121,6 +123,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/telegram/webhook").permitAll()
                         // Anonymous catalog events for the admin funnel; rate-limited in the service
                         .requestMatchers(HttpMethod.POST, "/api/v1/events").permitAll()
+                        // Chat WebSocket: the handshake checks the Origin and a single-use ticket from /api/v1/me/chat/socket-ticket
+                        .requestMatchers("/ws/chat", "/ws/chat/**").permitAll()
                         // Email unsubscribe links work without signing in
                         .requestMatchers("/api/v1/notifications/unsubscribe").permitAll()
                         // Instructor workspace; each course is checked against its owner in the service

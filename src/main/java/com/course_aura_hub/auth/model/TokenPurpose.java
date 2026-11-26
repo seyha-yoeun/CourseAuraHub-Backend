@@ -8,7 +8,9 @@ public enum TokenPurpose {
     EMAIL_VERIFICATION(true),
     PASSWORD_RESET(false),
     MFA_LOGIN_CHALLENGE(false),
-    TELEGRAM_LINK(false);
+    TELEGRAM_LINK(false),
+    // Single-use ticket that authenticates one chat WebSocket handshake
+    CHAT_SOCKET(false);
 
     private final boolean numeric;
 
