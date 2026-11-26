@@ -293,6 +293,10 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                 from chat_group_invites where invitee_id = :userId or inviter_id = :userId order by created_at""");
         queries.put("chatMessagesDeletedForMe", "select message_id as \"messageId\", created_at as \"deletedAt\" "
                 + "from chat_message_hidden_for where user_id = :userId order by created_at");
+        queries.put("chatMessageEdits", """
+                select e.message_id as "messageId", e.body, e.edited_at as "editedAt"
+                from chat_message_edits e join chat_messages m on m.id = e.message_id
+                where m.sender_id = :userId order by e.id""");
         queries.put("chatReactions", "select message_id as \"messageId\", emoji, created_at as \"reactedAt\" "
                 + "from chat_message_reactions where user_id = :userId order by created_at");
         queries.put("chatBlocks", """

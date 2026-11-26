@@ -322,6 +322,41 @@ class ChatMessagingIntegrationTest extends ChatTestSupport {
     }
 
     @Test
+    void ownMessages_canBeEditedForAWhile_andKeepTheirEarlierText() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        enroll(jane, slug);
+        enroll(bo, slug);
+        int conversation = openDirect(jane, bo);
+        int message = send(jane, conversation, "See you at 5");
+
+        mockMvc.perform(asJson(bo, patch(CHAT + "/messages/" + message), Map.of("body", "hacked"))).andExpect(status().isForbidden());
+        mockMvc.perform(asJson(registerUser(), patch(CHAT + "/messages/" + message), Map.of("body", "x"))).andExpect(status().isNotFound());
+        mockMvc.perform(asJson(jane, patch(CHAT + "/messages/" + message), Map.of("body", "  See you at 6  ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.body").value("See you at 6"))
+                .andExpect(jsonPath("$.data.editedAt").isNotEmpty());
+        // The same text again changes nothing; an empty text needs files to stand on
+        mockMvc.perform(asJson(jane, patch(CHAT + "/messages/" + message), Map.of("body", "See you at 6"))).andExpect(status().isOk());
+        mockMvc.perform(asJson(jane, patch(CHAT + "/messages/" + message), Map.of("body", "   "))).andExpect(status().isBadRequest());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from chat_message_edits where message_id = ?", Integer.class, message))
+                .isEqualTo(1);
+        mockMvc.perform(as(bo, get(CHAT + "/conversations/" + conversation + "/messages")))
+                .andExpect(jsonPath("$.data.items[0].body").value("See you at 6"))
+                .andExpect(jsonPath("$.data.items[0].editedAt").isNotEmpty());
+
+        int old = send(jane, conversation, "sent long ago");
+        jdbcTemplate.update("update chat_messages set created_at = now() - interval '1 hour' where id = ?", old);
+        mockMvc.perform(asJson(jane, patch(CHAT + "/messages/" + old), Map.of("body", "too late"))).andExpect(status().isBadRequest());
+
+        // Unsending drops the earlier versions too
+        mockMvc.perform(as(jane, delete(CHAT + "/messages/" + message))).andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForObject("select count(*) from chat_message_edits where message_id = ?", Integer.class, message))
+                .isZero();
+    }
+
+    @Test
     void replies_quoteAnEarlierMessage_andOnlyFromTheSameConversation() throws Exception {
         String slug = courseOwnedBy(registerInstructor());
         TestUser jane = registerUser();

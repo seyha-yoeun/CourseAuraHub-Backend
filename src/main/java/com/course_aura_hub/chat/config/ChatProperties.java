@@ -16,6 +16,7 @@ import java.time.Duration;
  * @param groupMemberLimit        most active members a group may have
  * @param inviteTtl               how long a group invite stays open
  * @param deleteWindow            how long after sending people may delete their own message
+ * @param editWindow              how long after sending people may edit their own message
  * @param maxAttachments          most files on one message
  * @param messagesPerMinute       messages one user may send per minute
  * @param reactionsPerMinute      reactions one user may add or change per minute
@@ -36,6 +37,7 @@ public record ChatProperties(
         @DefaultValue("100") int groupMemberLimit,
         @DefaultValue("7d") Duration inviteTtl,
         @DefaultValue("15m") Duration deleteWindow,
+        @DefaultValue("15m") Duration editWindow,
         @DefaultValue("5") int maxAttachments,
         @DefaultValue("30") int messagesPerMinute,
         @DefaultValue("60") int reactionsPerMinute,

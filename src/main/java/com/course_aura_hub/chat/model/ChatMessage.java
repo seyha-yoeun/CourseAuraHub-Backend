@@ -63,6 +63,10 @@ public class ChatMessage {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    /** When the sender last edited it; null if never */
+    @Column(name = "edited_at")
+    private Instant editedAt;
+
     @Column(name = "hidden_at")
     private Instant hiddenAt;
 

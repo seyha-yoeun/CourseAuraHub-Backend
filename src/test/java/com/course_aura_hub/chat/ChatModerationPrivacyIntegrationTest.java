@@ -13,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -32,6 +33,8 @@ class ChatModerationPrivacyIntegrationTest extends ChatTestSupport {
         send(jane, conversation, "hi");
         int abuse = send(bo, conversation, "something awful");
         send(jane, conversation, "please stop");
+        // Editing after the fact doesn't hide what was said from the moderator
+        mockMvc.perform(asJson(bo, patch(CHAT + "/messages/" + abuse), Map.of("body", "never mind"))).andExpect(status().isOk());
 
         mockMvc.perform(as(admin, get(CHAT + "/conversations/" + conversation + "/messages"))).andExpect(status().isNotFound());
         mockMvc.perform(asJson(registerUser(), post("/api/v1/me/reports"),
@@ -54,7 +57,9 @@ class ChatModerationPrivacyIntegrationTest extends ChatTestSupport {
                 .andExpect(jsonPath("$.data.conversationType").value("direct"))
                 .andExpect(jsonPath("$.data.messageId").value(abuse))
                 .andExpect(jsonPath("$.data.messages", hasSize(3)))
-                .andExpect(jsonPath("$.data.messages[1].body").value("something awful"));
+                .andExpect(jsonPath("$.data.messages[1].body").value("never mind"))
+                .andExpect(jsonPath("$.data.edits[0].messageId").value(abuse))
+                .andExpect(jsonPath("$.data.edits[0].body").value("something awful"));
         assertThat(audits(reportId)).isEqualTo(auditsBefore + 1);
         mockMvc.perform(as(jane, get("/api/v1/admin/chat/reports/" + reportId + "/context"))).andExpect(status().isForbidden());
 

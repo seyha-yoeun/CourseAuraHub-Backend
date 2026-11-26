@@ -50,6 +50,9 @@ public interface ChatService {
     /** Tells the others I'm typing; nothing is stored. */
     void typing(Actor actor, Integer conversationId);
 
+    /** Changes the text of my own message, within the edit window; the earlier text is kept for moderators. */
+    ChatDtos.Message editMessage(Actor actor, Integer messageId, ChatDtos.EditMessageRequest request);
+
     /** Unsends my own message for everyone, within the delete window. */
     ChatDtos.Message deleteMessage(Actor actor, Integer messageId);
 

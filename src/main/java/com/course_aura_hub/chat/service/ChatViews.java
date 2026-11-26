@@ -136,6 +136,17 @@ public class ChatViews {
         return views;
     }
 
+    /** Earlier texts of these messages, oldest first: for moderators, never shown in conversations. */
+    public List<ChatDtos.MessageEdit> editHistory(List<Integer> messageIds) {
+        if (messageIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query("""
+                select message_id, body, edited_at from chat_message_edits where message_id in (:ids) order by id
+                """, new MapSqlParameterSource("ids", messageIds), (row, index) -> new ChatDtos.MessageEdit(
+                row.getInt("message_id"), row.getString("body"), row.getTimestamp("edited_at").toInstant()));
+    }
+
     /** How many people reacted with one emoji, whether the viewer did, and the few who did most recently. */
     private static final class Tally {
         private long count;
@@ -271,7 +282,7 @@ public class ChatViews {
         }
         return new ChatDtos.Message(message.getId(), message.getConversationId(), lower(message.getKind()), sender,
                 visible ? message.getBody() : null, deleted, hidden, attachments, replyTo, visible ? reactions : List.of(),
-                mine ? message.getClientMessageId() : null, mine, message.getCreatedAt());
+                mine ? message.getClientMessageId() : null, mine, message.getCreatedAt(), visible ? message.getEditedAt() : null);
     }
 
     private String title(ChatConversation conversation, Course course, ChatDtos.Person peer,

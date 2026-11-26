@@ -145,7 +145,8 @@ public class ChatModerationServiceImpl implements ChatModerationService {
         log.info("Admin {} viewed chat report {} (conversation {})", admin.userId(), reportId, conversationId);
         return new ChatDtos.ReportContext(reportId, conversationId, ChatViews.lower(conversation.getType()),
                 course == null ? null : new ChatDtos.CourseRef(course.getId(), course.getSlug(), course.getTitle()),
-                message.getId(), views.messages(admin.userId(), window));
+                message.getId(), views.messages(admin.userId(), window),
+                views.editHistory(window.stream().map(ChatMessage::getId).toList()));
     }
 
     @Override

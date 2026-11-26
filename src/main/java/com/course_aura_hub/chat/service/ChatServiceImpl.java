@@ -402,6 +402,43 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
+    public ChatDtos.Message editMessage(Actor actor, Integer messageId, ChatDtos.EditMessageRequest request) {
+        UUID me = actor.userId();
+        ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
+        // Editing is writing: blocked, archived, closed and restricted conversations refuse it, and the conversation
+        // row is locked first, in the order sends use
+        access.requireWritable(actor, message.getConversationId());
+        if (message.getKind() != MessageKind.TEXT || !me.equals(message.getSenderId())) {
+            throw new ForbiddenActionException("You can only edit your own messages");
+        }
+        if (message.getDeletedAt() != null || message.getHiddenAt() != null) {
+            throw new BusinessRuleException("This message can't be edited any more");
+        }
+        if (message.getCreatedAt().plus(properties.editWindow()).isBefore(Instant.now())) {
+            throw new BusinessRuleException("Messages can only be edited within "
+                    + properties.editWindow().toMinutes() + " minutes of sending");
+        }
+        String body = request == null || !StringUtils.hasText(request.body()) ? null : request.body().strip();
+        if (body != null && body.length() > ChatDtos.MAX_BODY_LENGTH) {
+            throw new BusinessRuleException("Messages can be at most 4000 characters");
+        }
+        if (body == null && attachmentRepository.findByMessageId(messageId).isEmpty()) {
+            throw new BusinessRuleException("Write something, or delete the message instead");
+        }
+        if (java.util.Objects.equals(body, message.getBody())) {
+            return views.message(me, message);
+        }
+        jdbc.update("insert into chat_message_edits (message_id, body, edited_at) values (:messageId, :body, now())",
+                new MapSqlParameterSource("messageId", messageId).addValue("body", message.getBody()));
+        message.setBody(body);
+        message.setEditedAt(Instant.now());
+        messageRepository.save(message);
+        events.publishEvent(ChatSignal.message(ChatSignal.Kind.MESSAGE_UPDATED, message.getConversationId(), messageId, me));
+        return views.message(me, message);
+    }
+
+    @Override
+    @Transactional
     public ChatDtos.Message deleteMessage(Actor actor, Integer messageId) {
         ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
         access.requireReadable(actor, message.getConversationId());
@@ -419,6 +456,8 @@ public class ChatServiceImpl implements ChatService {
         message.setBody(null);
         messageRepository.save(message);
         removeAttachments(message);
+        // Unsent means gone for everyone, earlier versions included
+        jdbc.update("delete from chat_message_edits where message_id = :messageId", new MapSqlParameterSource("messageId", messageId));
         events.publishEvent(ChatSignal.message(ChatSignal.Kind.MESSAGE_UPDATED, message.getConversationId(), messageId, actor.userId()));
         return views.message(actor.userId(), message);
     }
@@ -652,6 +691,7 @@ public class ChatServiceImpl implements ChatService {
                 """, params, String.class);
         files.forEach(file -> fileService.release(file, userId));
         jdbc.update("delete from chat_attachments a using chat_messages m where m.id = a.message_id and m.sender_id = :userId", params);
+        jdbc.update("delete from chat_message_edits e using chat_messages m where m.id = e.message_id and m.sender_id = :userId", params);
         jdbc.update("""
                 update chat_messages set body = null, deleted_at = coalesce(deleted_at, now()), sender_id = null
                 where sender_id = :userId

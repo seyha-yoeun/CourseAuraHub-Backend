@@ -47,6 +47,12 @@ public final class ChatDtos {
     public record ReadRequest(@NotNull(message = "messageId is required") @Positive Integer messageId) {
     }
 
+    /** The new text; may be empty only when the message has files. */
+    public record EditMessageRequest(
+            @Size(max = MAX_BODY_LENGTH, message = "Messages can be at most 4000 characters") String body
+    ) {
+    }
+
     /** @param emoji one of the offered reactions: 👍 ❤️ 😂 😮 😢 🎉 */
     public record ReactRequest(
             @NotBlank(message = "Choose a reaction") @Size(max = 16, message = "Choose one of the offered reactions") String emoji
@@ -143,6 +149,7 @@ public final class ChatDtos {
      * @param reactions       by emoji, in the order they were first used; empty once the message is deleted or hidden
      * @param body            null once the message is deleted or hidden
      * @param clientMessageId only on your own messages
+     * @param editedAt        when the sender last edited it, or null
      */
     public record Message(
             Integer id,
@@ -157,7 +164,8 @@ public final class ChatDtos {
             List<Reaction> reactions,
             UUID clientMessageId,
             boolean mine,
-            Instant createdAt
+            Instant createdAt,
+            Instant editedAt
     ) {
     }
 
@@ -279,15 +287,24 @@ public final class ChatDtos {
     public record SupportPage(List<SupportThread> items, int page, int size, long total) {
     }
 
-    /** A reported message with the ten messages before and after it, for the admin deciding on the report. */
+    /**
+     * A reported message with the ten messages before and after it, for the admin deciding on the report.
+     *
+     * @param edits earlier texts of those messages, oldest first, so an edit can't hide what was reported
+     */
     public record ReportContext(
             Integer reportId,
             Integer conversationId,
             String conversationType,
             CourseRef course,
             Integer messageId,
-            List<Message> messages
+            List<Message> messages,
+            List<MessageEdit> edits
     ) {
+    }
+
+    /** @param body the text before this edit; null when the message had only files */
+    public record MessageEdit(Integer messageId, String body, Instant editedAt) {
     }
 
     public record Restriction(UUID userId, Instant until, String reason, Instant createdAt) {

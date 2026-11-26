@@ -144,6 +144,16 @@ public class ChatController {
         return ResponseEntity.ok(ApiResponse.success(chatService.markRead(Actor.of(user), id, request.messageId())));
     }
 
+    @PatchMapping("/api/v1/me/chat/messages/{id}")
+    @Operation(summary = "Edit my message",
+            description = "The sender only, within 15 minutes of sending. Everyone sees the new text and an edited mark; "
+                    + "the earlier text is kept for moderators.")
+    public ResponseEntity<ApiResponse<ChatDtos.Message>> editMessage(@PathVariable Integer id,
+                                                                    @Valid @RequestBody ChatDtos.EditMessageRequest request,
+                                                                    @AuthenticationPrincipal AuthUserPrincipal user) {
+        return ResponseEntity.ok(ApiResponse.success("Message edited", chatService.editMessage(Actor.of(user), id, request)));
+    }
+
     @DeleteMapping("/api/v1/me/chat/messages/{id}")
     @Operation(summary = "Unsend my message", description = "The sender only, within 15 minutes of sending. It is removed for everyone.")
     public ResponseEntity<ApiResponse<ChatDtos.Message>> deleteMessage(@PathVariable Integer id,
