@@ -185,6 +185,22 @@ public class ChatController {
         return ResponseEntity.ok(ApiResponse.success(chatService.unreact(Actor.of(user), id)));
     }
 
+    @PutMapping("/api/v1/me/chat/messages/{id}/pin")
+    @Operation(summary = "Pin a message",
+            description = "Either side of a direct or support chat, a group's owner and admins, a course's staff in its "
+                    + "course chat. Up to 5 pins per conversation. Returns the conversation with its pins.")
+    public ResponseEntity<ApiResponse<ChatDtos.Conversation>> pin(@PathVariable Integer id,
+                                                                 @AuthenticationPrincipal AuthUserPrincipal user) {
+        return ResponseEntity.ok(ApiResponse.success("Message pinned", chatService.pin(Actor.of(user), id)));
+    }
+
+    @DeleteMapping("/api/v1/me/chat/messages/{id}/pin")
+    @Operation(summary = "Unpin a message", description = "The same people who may pin. Returns the conversation with its pins.")
+    public ResponseEntity<ApiResponse<ChatDtos.Conversation>> unpin(@PathVariable Integer id,
+                                                                   @AuthenticationPrincipal AuthUserPrincipal user) {
+        return ResponseEntity.ok(ApiResponse.success("Message unpinned", chatService.unpin(Actor.of(user), id)));
+    }
+
     @PostMapping("/api/v1/me/chat/messages/{id}/hide")
     @Operation(summary = "Hide a message", description = "Group owners and admins in their group; course staff in their course channel.")
     public ResponseEntity<ApiResponse<ChatDtos.Message>> hideMessage(@PathVariable Integer id,

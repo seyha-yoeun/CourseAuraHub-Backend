@@ -357,6 +357,57 @@ class ChatMessagingIntegrationTest extends ChatTestSupport {
     }
 
     @Test
+    void pins_followEachConversationsRules_andStopAtTheLimit() throws Exception {
+        TestUser instructor = registerInstructor();
+        String slug = courseOwnedBy(instructor);
+        TestUser jane = registerUser();
+        TestUser bo = registerUser();
+        enroll(jane, slug);
+        enroll(bo, slug);
+
+        // A direct conversation: either side pins
+        int direct = openDirect(jane, bo);
+        int link = send(jane, direct, "Meeting link: https://example.com/room");
+        mockMvc.perform(as(bo, put(CHAT + "/messages/" + link + "/pin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.canPin").value(true))
+                .andExpect(jsonPath("$.data.pins", hasSize(1)))
+                .andExpect(jsonPath("$.data.pins[0].messageId").value(link))
+                .andExpect(jsonPath("$.data.pins[0].preview").value("Meeting link: https://example.com/room"));
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + direct)))
+                .andExpect(jsonPath("$.data.pins[0].pinnedBy.id").value(id(bo).toString()));
+        mockMvc.perform(as(registerUser(), put(CHAT + "/messages/" + link + "/pin"))).andExpect(status().isNotFound());
+
+        for (int i = 0; i < 4; i++) {
+            int note = send(jane, direct, "note " + i);
+            mockMvc.perform(as(jane, put(CHAT + "/messages/" + note + "/pin"))).andExpect(status().isOk());
+        }
+        int sixth = send(jane, direct, "one too many");
+        mockMvc.perform(as(jane, put(CHAT + "/messages/" + sixth + "/pin"))).andExpect(status().isBadRequest());
+        mockMvc.perform(as(jane, delete(CHAT + "/messages/" + link + "/pin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pins", hasSize(4)));
+        mockMvc.perform(as(jane, put(CHAT + "/messages/" + sixth + "/pin")))
+                .andExpect(jsonPath("$.data.pins", hasSize(5)))
+                .andExpect(jsonPath("$.data.pins[0].messageId").value(sixth));
+        // An unsent message drops out of the pins, freeing its place
+        mockMvc.perform(as(jane, delete(CHAT + "/messages/" + sixth))).andExpect(status().isOk());
+        mockMvc.perform(as(bo, get(CHAT + "/conversations/" + direct))).andExpect(jsonPath("$.data.pins", hasSize(4)));
+
+        // A course chat: its staff only
+        String body = mockMvc.perform(as(jane, get(CHAT + "/courses/" + slug + "/channel")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        int channel = JsonPath.read(body, "$.data.id");
+        int question = send(jane, channel, "When is the exam?");
+        mockMvc.perform(as(jane, get(CHAT + "/conversations/" + channel))).andExpect(jsonPath("$.data.canPin").value(false));
+        mockMvc.perform(as(jane, put(CHAT + "/messages/" + question + "/pin"))).andExpect(status().isForbidden());
+        mockMvc.perform(as(instructor, put(CHAT + "/messages/" + question + "/pin")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pins[0].messageId").value(question));
+    }
+
+    @Test
     void replies_quoteAnEarlierMessage_andOnlyFromTheSameConversation() throws Exception {
         String slug = courseOwnedBy(registerInstructor());
         TestUser jane = registerUser();

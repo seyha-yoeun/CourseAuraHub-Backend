@@ -1,5 +1,6 @@
 package com.course_aura_hub.chat.service;
 
+import com.course_aura_hub.chat.config.ChatProperties;
 import com.course_aura_hub.chat.dto.ChatDtos;
 import com.course_aura_hub.chat.model.ChatAttachment;
 import com.course_aura_hub.chat.model.ChatConversation;
@@ -17,6 +18,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -44,6 +46,8 @@ public class ChatViews {
     private final ChatParticipantRepository participantRepository;
     private final ChatPeople people;
     private final ChatPresence presence;
+    private final ChatAccess access;
+    private final ChatProperties properties;
     private final FileService fileService;
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -63,6 +67,13 @@ public class ChatViews {
         if (last != null && last.getSenderId() != null) {
             ids.add(last.getSenderId());
         }
+        List<PinRow> pinRows = pinRows(conversation.getId(), viewerId);
+        Map<Integer, ChatMessage> pinned = pinRows.isEmpty() ? Map.of() : messageRepository
+                .findAllById(pinRows.stream().map(PinRow::messageId).toList()).stream()
+                .collect(Collectors.toMap(ChatMessage::getId, item -> item));
+        pinRows.forEach(row -> ids.add(row.pinnedBy()));
+        pinned.values().forEach(message -> ids.add(message.getSenderId()));
+        ids.remove(null);
         Map<UUID, ChatDtos.Person> named = people.lookup(viewerId, ids);
         ChatDtos.Person peer = view.peerId() == null ? null : named.get(view.peerId());
 
@@ -97,7 +108,41 @@ public class ChatViews {
                 group,
                 receipt,
                 conversation.getType() == ConversationType.DIRECT ? presence.forViewer(viewerId, view.peerId()) : null,
+                pinViews(pinRows, pinned, named),
+                viewerId != null && access.canPin(view, viewerId),
                 conversation.getLastActivityAt());
+    }
+
+    private record PinRow(Integer messageId, UUID pinnedBy, Instant pinnedAt) {
+    }
+
+    /** Pins this viewer can see: not of unsent or hidden messages, nor of ones they deleted for themselves. */
+    private List<PinRow> pinRows(Integer conversationId, UUID viewerId) {
+        return jdbc.query("""
+                select p.message_id, p.pinned_by, p.pinned_at
+                from chat_pins p join chat_messages m on m.id = p.message_id
+                where p.conversation_id = :conversationId and m.deleted_at is null and m.hidden_at is null
+                  and not exists (select 1 from chat_message_hidden_for h where h.message_id = p.message_id and h.user_id = :viewerId)
+                order by p.pinned_at desc
+                limit :limit
+                """, new MapSqlParameterSource("conversationId", conversationId).addValue("viewerId", viewerId)
+                .addValue("limit", properties.maxPins()), (row, index) -> new PinRow(row.getInt("message_id"),
+                row.getObject("pinned_by", UUID.class), row.getTimestamp("pinned_at").toInstant()));
+    }
+
+    private List<ChatDtos.Pin> pinViews(List<PinRow> rows, Map<Integer, ChatMessage> messages, Map<UUID, ChatDtos.Person> named) {
+        List<ChatDtos.Pin> pins = new ArrayList<>(rows.size());
+        for (PinRow row : rows) {
+            ChatMessage message = messages.get(row.messageId());
+            if (message == null) {
+                continue;
+            }
+            ChatDtos.Person sender = message.getSenderId() == null
+                    ? new ChatDtos.Person(null, ChatPeople.DELETED_NAME, null, false) : named.get(message.getSenderId());
+            pins.add(new ChatDtos.Pin(message.getId(), preview(message, attachmentCount(message)), sender,
+                    row.pinnedBy() == null ? null : named.get(row.pinnedBy()), row.pinnedAt()));
+        }
+        return pins;
     }
 
     /** Hidden from the viewer's list: they hid it and nothing happened in it since. */

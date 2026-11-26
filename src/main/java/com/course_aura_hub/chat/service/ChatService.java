@@ -65,6 +65,12 @@ public interface ChatService {
     /** Takes my reaction off a message, if I had one. */
     ChatDtos.Message unreact(Actor actor, Integer messageId);
 
+    /** Pins a message at the top of its conversation, if I may pin there ({@link ChatAccess#canPin}). */
+    ChatDtos.Conversation pin(Actor actor, Integer messageId);
+
+    /** Takes a pin off. */
+    ChatDtos.Conversation unpin(Actor actor, Integer messageId);
+
     /** Hides a message: group owners and admins in their group, course staff in their course channel. */
     ChatDtos.Message hideMessage(Actor actor, Integer messageId);
 

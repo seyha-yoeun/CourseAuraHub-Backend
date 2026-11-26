@@ -5,6 +5,7 @@ import com.course_aura_hub.chat.model.ChatParticipant;
 import com.course_aura_hub.chat.model.ChatRestriction;
 import com.course_aura_hub.chat.model.ConversationStatus;
 import com.course_aura_hub.chat.model.ConversationType;
+import com.course_aura_hub.chat.model.ParticipantRole;
 import com.course_aura_hub.chat.repository.ChatBlockRepository;
 import com.course_aura_hub.chat.repository.ChatConversationRepository;
 import com.course_aura_hub.chat.repository.ChatParticipantRepository;
@@ -76,6 +77,22 @@ public class ChatAccess {
         public boolean canSend() {
             return readOnlyReason == null;
         }
+    }
+
+    /**
+     * Who may pin and unpin messages: either side of a direct or support chat, the owner and admins of a group,
+     * a course's staff in its course chat. Only while they can write there.
+     */
+    public boolean canPin(View view, UUID userId) {
+        if (!view.canSend()) {
+            return false;
+        }
+        return switch (view.conversation().getType()) {
+            case DIRECT, SUPPORT -> true;
+            case GROUP -> view.participant() != null && view.participant().isActive()
+                    && view.participant().getRole() != ParticipantRole.MEMBER;
+            case COURSE -> eligibility.isStaff(userId, view.conversation().getCourseId());
+        };
     }
 
     public View requireReadable(Actor actor, Integer conversationId) {

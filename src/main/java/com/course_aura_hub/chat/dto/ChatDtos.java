@@ -189,6 +189,15 @@ public final class ChatDtos {
     public record Presence(boolean online, Instant lastSeenAt) {
     }
 
+    /**
+     * A message pinned at the top of a conversation.
+     *
+     * @param preview  a short text of the message
+     * @param pinnedBy who pinned it; null if their account is gone
+     */
+    public record Pin(Integer messageId, String preview, Person sender, Person pinnedBy, Instant pinnedAt) {
+    }
+
     /** How far the other person in a direct conversation has got: "Delivered" and "Seen" ticks. */
     public record Receipt(int deliveredMessageId, int readMessageId) {
     }
@@ -200,6 +209,8 @@ public final class ChatDtos {
      * @param myRole         owner, admin or member in a group; member elsewhere; null without a membership
      * @param peerReceipt    direct conversations only
      * @param peerPresence   direct conversations only; null when the peer hides it or either of you blocked the other
+     * @param pins           pinned messages, newest pin first
+     * @param canPin         whether I may pin and unpin here
      */
     public record Conversation(
             Integer id,
@@ -219,6 +230,8 @@ public final class ChatDtos {
             Group group,
             Receipt peerReceipt,
             Presence peerPresence,
+            List<Pin> pins,
+            boolean canPin,
             Instant lastActivityAt
     ) {
     }

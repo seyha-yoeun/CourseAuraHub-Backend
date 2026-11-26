@@ -527,6 +527,57 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
+    public ChatDtos.Conversation pin(Actor actor, Integer messageId) {
+        ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
+        Integer conversationId = message.getConversationId();
+        // Locks the conversation row, so two pins at once can't both get past the limit
+        ChatAccess.View view = access.requireWritable(actor, conversationId);
+        if (!access.canPin(view, actor.userId())) {
+            throw new ForbiddenActionException("You can't pin messages in this conversation");
+        }
+        if (message.getKind() != MessageKind.TEXT || message.getDeletedAt() != null || message.getHiddenAt() != null) {
+            throw new BusinessRuleException("This message can't be pinned");
+        }
+        MapSqlParameterSource params = new MapSqlParameterSource("conversationId", conversationId)
+                .addValue("messageId", messageId).addValue("me", actor.userId());
+        Integer pinned = jdbc.queryForObject("""
+                select count(*) from chat_pins p join chat_messages m on m.id = p.message_id
+                where p.conversation_id = :conversationId and p.message_id <> :messageId
+                  and m.deleted_at is null and m.hidden_at is null
+                """, params, Integer.class);
+        if (pinned != null && pinned >= properties.maxPins()) {
+            throw new BusinessRuleException("A conversation can have " + properties.maxPins() + " pinned messages. Unpin one first.");
+        }
+        int added = jdbc.update("""
+                insert into chat_pins (conversation_id, message_id, pinned_by, pinned_at)
+                values (:conversationId, :messageId, :me, now())
+                on conflict do nothing
+                """, params);
+        if (added > 0) {
+            events.publishEvent(ChatSignal.conversation(ChatSignal.Kind.CONVERSATION_UPDATED, conversationId, actor.userId(), null));
+        }
+        return views.conversation(actor.userId(), actor.admin(), access.requireReadable(actor, conversationId));
+    }
+
+    @Override
+    @Transactional
+    public ChatDtos.Conversation unpin(Actor actor, Integer messageId) {
+        ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
+        Integer conversationId = message.getConversationId();
+        ChatAccess.View view = access.requireWritable(actor, conversationId);
+        if (!access.canPin(view, actor.userId())) {
+            throw new ForbiddenActionException("You can't unpin messages in this conversation");
+        }
+        int removed = jdbc.update("delete from chat_pins where conversation_id = :conversationId and message_id = :messageId",
+                new MapSqlParameterSource("conversationId", conversationId).addValue("messageId", messageId));
+        if (removed > 0) {
+            events.publishEvent(ChatSignal.conversation(ChatSignal.Kind.CONVERSATION_UPDATED, conversationId, actor.userId(), null));
+        }
+        return views.conversation(actor.userId(), actor.admin(), access.requireReadable(actor, conversationId));
+    }
+
+    @Override
+    @Transactional
     public ChatDtos.Message hideMessage(Actor actor, Integer messageId) {
         ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
         ChatAccess.View view = access.requireReadable(actor, message.getConversationId());
@@ -705,6 +756,7 @@ public class ChatServiceImpl implements ChatService {
         jdbc.update("delete from chat_blocks where blocker_id = :userId or blocked_id = :userId", params);
         jdbc.update("delete from chat_message_hidden_for where user_id = :userId", params);
         jdbc.update("delete from chat_message_reactions where user_id = :userId", params);
+        jdbc.update("update chat_pins set pinned_by = null where pinned_by = :userId", params);
         jdbc.update("delete from chat_presence where user_id = :userId", params);
         jdbc.update("delete from chat_settings where user_id = :userId", params);
         jdbc.update("delete from chat_restrictions where user_id = :userId", params);

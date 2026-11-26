@@ -291,6 +291,7 @@ app:
     delete-window: ${CHAT_DELETE_WINDOW:15m}
     edit-window: ${CHAT_EDIT_WINDOW:15m}
     max-attachments: ${CHAT_MAX_ATTACHMENTS:5}
+    max-pins: ${CHAT_MAX_PINS:5}
     # Spam limits per user (skipped when app.rate-limit.enabled is false)
     messages-per-minute: ${CHAT_MESSAGES_PER_MINUTE:30}
     reactions-per-minute: ${CHAT_REACTIONS_PER_MINUTE:60}
