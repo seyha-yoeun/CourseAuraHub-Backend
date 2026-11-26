@@ -170,7 +170,9 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                // The docs' dark theme and light/dark switch (SwaggerThemeTransformer)
+                                "/swagger-theme/**"
                         ).permitAll()
                         // Default error controller
                         .requestMatchers("/error").permitAll()

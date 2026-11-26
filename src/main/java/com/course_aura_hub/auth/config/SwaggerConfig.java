@@ -8,6 +8,12 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.models.GroupedOpenApi;
+import org.springdoc.core.properties.SwaggerUiConfigProperties;
+import org.springdoc.core.properties.SwaggerUiOAuthProperties;
+import org.springdoc.core.providers.ObjectMapperProvider;
+import org.springdoc.webmvc.ui.SwaggerIndexTransformer;
+import org.springdoc.webmvc.ui.SwaggerWelcomeCommon;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -56,6 +62,19 @@ public class SwaggerConfig {
         return group("admin", "Platform Administration API", ApiAudience.ADMIN,
                 "Admin only: platform management, course review, orders and refunds, payouts, learners, "
                         + "statistics and settings.");
+    }
+
+    /**
+     * Swagger UI with a dark theme and a light/dark switch ({@link SwaggerThemeTransformer}). springdoc's own
+     * transformer backs off when this bean exists.
+     */
+    @Bean
+    @ConditionalOnProperty(name = "springdoc.swagger-ui.enabled", matchIfMissing = true)
+    public SwaggerIndexTransformer swaggerThemeTransformer(SwaggerUiConfigProperties swaggerUiConfig,
+                                                           SwaggerUiOAuthProperties swaggerUiOAuthProperties,
+                                                           SwaggerWelcomeCommon swaggerWelcomeCommon,
+                                                           ObjectMapperProvider objectMapperProvider) {
+        return new SwaggerThemeTransformer(swaggerUiConfig, swaggerUiOAuthProperties, swaggerWelcomeCommon, objectMapperProvider);
     }
 
     private static GroupedOpenApi group(String id, String name, ApiAudience audience, String description) {
