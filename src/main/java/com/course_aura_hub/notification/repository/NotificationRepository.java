@@ -35,6 +35,18 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("update Notification n set n.readAt = :readAt where n.userId = :userId and n.readAt is null")
     int markAllRead(@Param("userId") UUID userId, @Param("readAt") Instant readAt);
 
+    @Modifying
+    @Query("""
+            update Notification n set n.readAt = :readAt
+            where n.userId = :userId and n.type = :type and n.link = :link and n.readAt is null
+            """)
+    int markReadByLink(
+            @Param("userId") UUID userId,
+            @Param("type") NotificationType type,
+            @Param("link") String link,
+            @Param("readAt") Instant readAt
+    );
+
     @Query("""
             select distinct n.userId
             from Notification n

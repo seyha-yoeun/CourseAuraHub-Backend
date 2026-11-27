@@ -1,0 +1,495 @@
+/*
+ * Course Aura Hub: dark theme for Swagger UI (springdoc, Swagger UI 5).
+ *
+ * Loaded on every docs page by SwaggerThemeTransformer. It only applies while <html data-theme="dark">, which the
+ * page sets from the saved choice (swagger-theme.js) or the system setting. Colours follow the app's dark palette;
+ * the HTTP method colours stay Swagger's own, so GET, POST, PUT, DELETE read the same in both themes.
+ *
+ * Each rule repeats Swagger's own selector under :where(...), which adds no specificity: the rule weighs the same
+ * as Swagger's and wins by coming later, while Swagger's more specific rules (.btn.execute, .btn.cancel...) still
+ * win where they should. Nesting needs a 2023+ browser; older ones simply keep the light theme.
+ */
+
+/* ---- The light/dark switch (both themes) ---- */
+
+.cah-theme-toggle {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(11, 31, 23, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  color: #0b1f17;
+  cursor: pointer;
+  box-shadow: 0 10px 28px -10px rgba(11, 31, 23, 0.45);
+  transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.cah-theme-toggle:hover {
+  transform: scale(1.06);
+}
+
+.cah-theme-toggle:active {
+  transform: scale(0.95);
+}
+
+.cah-theme-toggle:focus-visible {
+  outline: 3px solid rgba(77, 187, 143, 0.6);
+  outline-offset: 2px;
+}
+
+.cah-theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+html[data-theme='dark'] .cah-theme-toggle {
+  border-color: rgba(229, 234, 231, 0.16);
+  background: #172019;
+  color: #e5eae7;
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cah-theme-toggle {
+    transition: none;
+  }
+}
+
+/* ---- Dark theme ---- */
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --cah-bg: #0a100d;
+  --cah-surface: #111915;
+  --cah-raised: #172019;
+  --cah-input: #0d1411;
+  --cah-code: #0d1512;
+  --cah-border: rgba(229, 234, 231, 0.12);
+  --cah-border-strong: rgba(229, 234, 231, 0.22);
+  --cah-text: #e5eae7;
+  --cah-muted: #a6b2ac;
+  --cah-faint: #7d8a84;
+  --cah-link: #9fe3c6;
+  --cah-accent: #4dbb8f;
+  --cah-type: #a5b4fc;
+  --cah-inline-code: #d6bcfa;
+  --cah-danger: #ff8a8a;
+}
+
+html[data-theme='dark'] body {
+  background: var(--cah-bg);
+  color: var(--cah-text);
+}
+
+:where(html[data-theme='dark']) .swagger-ui {
+  color: var(--cah-text);
+
+  /* Top bar and the "Select a definition" box */
+  & .topbar {
+    background-color: #0d2a21;
+    border-bottom: 1px solid var(--cah-border);
+  }
+
+  & .topbar .download-url-wrapper .select-label select,
+  & .topbar .download-url-wrapper input[type=text] {
+    border-color: var(--cah-accent);
+    background-color: var(--cah-input);
+    color: var(--cah-text);
+  }
+
+  & .topbar .download-url-wrapper .download-url-button {
+    background: var(--cah-accent);
+  }
+
+  /* Title, description and links */
+  & .info .title,
+  & .info h1,
+  & .info h2,
+  & .info h3,
+  & .info h4,
+  & .info h5,
+  & .info li,
+  & .info p,
+  & .info table,
+  & .info .base-url {
+    color: var(--cah-text);
+  }
+
+  & .info a,
+  & .markdown a,
+  & .renderedMarkdown a {
+    color: var(--cah-link);
+  }
+
+  & .info a:hover {
+    color: #c5f0dd;
+  }
+
+  & .info .title small {
+    background: #4f5b56;
+  }
+
+  /* Servers and the Authorize bar */
+  & .scheme-container {
+    background: var(--cah-surface);
+    box-shadow: 0 1px 0 var(--cah-border);
+  }
+
+  & .scheme-container .schemes > .schemes-server-container > label,
+  & .servers > label {
+    color: var(--cah-text);
+  }
+
+  /* Tag sections */
+  & .opblock-tag {
+    color: var(--cah-text);
+    border-bottom-color: var(--cah-border);
+  }
+
+  & .opblock-tag small {
+    color: var(--cah-muted);
+  }
+
+  & .opblock-tag:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  /* Operations */
+  & .opblock .opblock-summary-operation-id,
+  & .opblock .opblock-summary-path,
+  & .opblock .opblock-summary-path__deprecated {
+    color: var(--cah-text);
+  }
+
+  & .opblock .opblock-summary-description {
+    color: var(--cah-muted);
+  }
+
+  & .opblock.is-open .opblock-summary {
+    border-bottom-color: var(--cah-border);
+  }
+
+  & .opblock .opblock-section-header {
+    background: rgba(255, 255, 255, 0.04);
+    box-shadow: 0 1px 0 var(--cah-border);
+  }
+
+  & .opblock .opblock-section-header > label,
+  & .opblock .opblock-section-header h4 {
+    color: var(--cah-text);
+  }
+
+  & .opblock.opblock-deprecated .opblock-summary-method {
+    background: #5d6863;
+  }
+
+  & .opblock-description-wrapper,
+  & .opblock-description-wrapper p,
+  & .opblock-description-wrapper h4,
+  & .opblock-external-docs-wrapper,
+  & .opblock-external-docs-wrapper p,
+  & .opblock-external-docs-wrapper h4,
+  & .opblock-title_normal,
+  & .opblock-title_normal p,
+  & .opblock-title_normal h4 {
+    color: var(--cah-text);
+  }
+
+  & .tab li {
+    color: var(--cah-text);
+  }
+
+  & .tab li:first-of-type::after {
+    background: var(--cah-border-strong);
+  }
+
+  /* Parameters, responses and their tables */
+  & table thead tr td,
+  & table thead tr th {
+    color: var(--cah-text);
+    border-bottom-color: var(--cah-border);
+  }
+
+  & .parameter__name,
+  & .parameter__type,
+  & table.headers td {
+    color: var(--cah-text);
+  }
+
+  & .parameter__in,
+  & .parameter__extension,
+  & table.headers .header-example {
+    color: var(--cah-faint);
+  }
+
+  & .parameter__name.required span,
+  & .parameter__deprecated {
+    color: var(--cah-danger);
+  }
+
+  & .responses-inner h4,
+  & .responses-inner h5,
+  & .response-col_status,
+  & .response-col_links {
+    color: var(--cah-text);
+  }
+
+  & .response-col_status .response-undocumented,
+  & .response-col_links .response-undocumented {
+    color: var(--cah-faint);
+  }
+
+  /* Descriptions written in Markdown */
+  & .markdown p,
+  & .markdown li,
+  & .markdown pre,
+  & .renderedMarkdown p,
+  & .renderedMarkdown li,
+  & .renderedMarkdown pre {
+    color: var(--cah-text);
+  }
+
+  & .markdown code,
+  & .renderedMarkdown code {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--cah-inline-code);
+  }
+
+  /* Example and response bodies; the highlighter sets its background inline */
+  & .opblock-body pre.microlight,
+  & .highlight-code > .microlight {
+    background: var(--cah-code) !important;
+    border: 1px solid var(--cah-border);
+  }
+
+  & textarea.curl {
+    background: var(--cah-code);
+    color: var(--cah-text);
+  }
+
+  /* Buttons (Execute, Authorize and Cancel keep Swagger's colours) */
+  & .btn {
+    color: var(--cah-text);
+    border-color: var(--cah-border-strong);
+    box-shadow: none;
+  }
+
+  & .btn:hover {
+    box-shadow: 0 0 0 1px var(--cah-border-strong);
+  }
+
+  /* Form fields */
+  & input[type=email],
+  & input[type=file],
+  & input[type=password],
+  & input[type=search],
+  & input[type=text],
+  & textarea {
+    background: var(--cah-input);
+    color: var(--cah-text);
+    border: 1px solid var(--cah-border-strong);
+  }
+
+  & input[type=email].invalid,
+  & input[type=file].invalid,
+  & input[type=password].invalid,
+  & input[type=search].invalid,
+  & input[type=text].invalid,
+  & select.invalid {
+    background: rgba(249, 62, 62, 0.12);
+    border-color: #f93e3e;
+  }
+
+  & input[disabled],
+  & select[disabled],
+  & textarea[disabled] {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: var(--cah-faint);
+  }
+
+  & select {
+    background-color: var(--cah-input);
+    /* Swagger's own arrow, drawn light */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23c9d3ce' d='M13.418 7.859a.695.695 0 0 1 .978 0 .68.68 0 0 1 0 .969l-3.908 3.83a.697.697 0 0 1-.979 0l-3.908-3.83a.68.68 0 0 1 0-.969.695.695 0 0 1 .978 0L10 11l3.418-3.141z'/%3E%3C/svg%3E");
+    border-color: var(--cah-border-strong);
+    box-shadow: none;
+    color: var(--cah-text);
+  }
+
+  & select[multiple] {
+    background: var(--cah-input);
+  }
+
+  & .filter .operation-filter-input {
+    border-color: var(--cah-border-strong);
+    background: var(--cah-input);
+    color: var(--cah-text);
+  }
+
+  /* Arrows and icons */
+  & svg.arrow,
+  & .opblock-tag svg,
+  & .expand-methods svg,
+  & .expand-operation svg,
+  & .models-control svg,
+  & .model-box-control svg,
+  & .authorization__btn svg,
+  & .json-schema-2020-12-accordion__icon svg,
+  & .dialog-ux .modal-ux-header .close-modal svg {
+    fill: var(--cah-muted);
+  }
+
+  & .expand-methods:hover svg {
+    fill: var(--cah-text);
+  }
+
+  & .model-toggle::after {
+    filter: invert(1) brightness(0.85);
+  }
+
+  /* Schemas (OpenAPI 3.0 style) */
+  & section.models {
+    border-color: var(--cah-border);
+  }
+
+  & section.models.is-open h4 {
+    border-bottom-color: var(--cah-border);
+  }
+
+  & section.models h4 {
+    color: var(--cah-text);
+  }
+
+  & section.models h4:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  & section.models h5 {
+    color: var(--cah-muted);
+  }
+
+  & section.models .model-container {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  & section.models .model-container:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  & .model-box {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  & .model,
+  & .model-title {
+    color: var(--cah-text);
+  }
+
+  & .model .property {
+    color: var(--cah-faint);
+  }
+
+  & .model .property.primitive,
+  & .model .external-docs,
+  & table.model tr.description,
+  & .prop-format {
+    color: var(--cah-muted);
+  }
+
+  & table.model tr.extension {
+    color: var(--cah-faint);
+  }
+
+  & .prop-type {
+    color: var(--cah-type);
+  }
+
+  /* Schemas (OpenAPI 3.1, JSON Schema 2020-12) */
+  & .json-schema-2020-12 {
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+
+  & .json-schema-2020-12--embedded {
+    background-color: inherit;
+  }
+
+  & .json-schema-2020-12__title,
+  & .json-schema-2020-12-keyword__name--secondary,
+  & .json-schema-2020-12-keyword__value,
+  & .json-schema-2020-12-keyword__value--secondary,
+  & .json-schema-2020-12-keyword--description {
+    color: var(--cah-muted);
+  }
+
+  & .json-schema-2020-12-keyword__name--primary,
+  & .json-schema-2020-12-keyword__value--primary,
+  & .json-schema-2020-12__attribute,
+  & .json-schema-2020-12-property .json-schema-2020-12__title {
+    color: var(--cah-text);
+  }
+
+  & .json-schema-2020-12__attribute--primary {
+    color: var(--cah-type);
+  }
+
+  & .json-schema-2020-12-expand-deep-button {
+    color: var(--cah-faint);
+  }
+
+  & .json-schema-2020-12-keyword__value--const {
+    border-color: var(--cah-border-strong);
+    color: var(--cah-muted);
+  }
+
+  /* The Authorize dialog */
+  & .dialog-ux .modal-ux {
+    background: var(--cah-surface);
+    border-color: var(--cah-border);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  }
+
+  & .dialog-ux .modal-ux-header {
+    border-bottom-color: var(--cah-border);
+  }
+
+  & .dialog-ux .modal-ux-header h3,
+  & .dialog-ux .modal-ux-content h4,
+  & .dialog-ux .modal-ux-content p {
+    color: var(--cah-text);
+  }
+
+  & .auth-container {
+    border-bottom-color: var(--cah-border);
+  }
+
+  & .auth-container .errors {
+    background-color: rgba(249, 62, 62, 0.12);
+    color: var(--cah-danger);
+  }
+
+  /* Errors and loading */
+  & .errors-wrapper {
+    background: rgba(249, 62, 62, 0.08);
+  }
+
+  & .errors-wrapper .errors h4,
+  & .errors-wrapper hgroup h4 {
+    color: var(--cah-text);
+  }
+
+  & .errors-wrapper .errors small {
+    color: var(--cah-muted);
+  }
+
+  & .loading-container .loading::after {
+    color: var(--cah-muted);
+  }
+}

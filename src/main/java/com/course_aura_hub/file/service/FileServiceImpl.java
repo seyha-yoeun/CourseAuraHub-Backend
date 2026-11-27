@@ -152,12 +152,25 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public StoredFileResponse requireOwnedFile(UUID fileId, UUID userId, FilePurpose purpose) {
+        return fileRepository.findByIdAndUploadedBy(fileId, userId)
+                .filter(file -> file.getPurpose() == purpose && file.getStatus() == FileStatus.READY)
+                .map(this::toResponse)
+                .orElseThrow(() -> new BusinessRuleException("This file can't be used here"));
+    }
+
+    @Override
     public void release(String url, UUID userId) {
         String base = properties.publicBaseUrl() + "/";
-        if (url == null || !url.startsWith(base)) {
+        String key;
+        if (url != null && url.startsWith(REFERENCE_PREFIX)) {
+            key = url.substring(REFERENCE_PREFIX.length());
+        } else if (url != null && url.startsWith(base)) {
+            key = url.substring(base.length());
+        } else {
             return;
         }
-        fileRepository.findByObjectKey(url.substring(base.length()))
+        fileRepository.findByObjectKey(key)
                 .filter(file -> userId.equals(file.getUploadedBy()) && file.getStatus() == FileStatus.READY)
                 .ifPresent(file -> {
                     file.setStatus(FileStatus.RELEASED);

@@ -8,6 +8,7 @@ import com.course_aura_hub.auth.repository.UserRepository;
 import com.course_aura_hub.auth.service.AuthAuditEntry;
 import com.course_aura_hub.auth.service.AuthAuditService;
 import com.course_aura_hub.auth.service.RefreshSessionService;
+import com.course_aura_hub.chat.service.ChatService;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ForbiddenActionException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
@@ -44,6 +45,7 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
     private final AuthAuditService auditService;
     private final PasswordEncoder passwordEncoder;
     private final NamedParameterJdbcTemplate jdbc;
+    private final ChatService chatService;
 
     @Override
     @Transactional(readOnly = true)
@@ -155,6 +157,8 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
 
         jdbc.update("delete from calendar_tokens where user_id = :userId", params);
         refreshSessionService.revokeAllSessions(userId, SessionRevocationReason.ACCOUNT_DELETED);
+        // Chat: leave groups (handing ownership on), drop message bodies and files, blocks and settings
+        chatService.eraseAccount(userId);
         // Submitted code is the learner's own work; completed lessons stay completed
         jdbc.update("delete from code_submissions where student_id = :studentId", params);
         user.setEmail(("deleted-" + userId + "@deleted.invalid").toLowerCase(Locale.ROOT));
@@ -272,6 +276,41 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
         queries.put("signInProviders", """
                 select provider, email, created_at as "linkedAt", last_login_at as "lastLoginAt"
                 from user_oauth_identities where user_id = :userId""");
+        queries.put("chatMessages", """
+                select m.conversation_id as "conversationId", lower(cv.type) as "conversationType", m.body,
+                       m.created_at as "sentAt", m.deleted_at as "deletedAt"
+                from chat_messages m join chat_conversations cv on cv.id = m.conversation_id
+                where m.sender_id = :userId and m.kind = 'TEXT' order by m.id""");
+        queries.put("chatMemberships", """
+                select p.conversation_id as "conversationId", lower(cv.type) as "conversationType", cv.title,
+                       lower(p.role) as role, p.joined_at as "joinedAt", p.left_at as "leftAt", p.muted,
+                       p.pinned_at as "pinnedAt"
+                from chat_participants p join chat_conversations cv on cv.id = p.conversation_id
+                where p.user_id = :userId order by p.joined_at""");
+        queries.put("chatInvites", """
+                select conversation_id as "conversationId", lower(status) as status,
+                       case when invitee_id = :userId then 'received' else 'sent' end as direction,
+                       created_at as "createdAt", responded_at as "respondedAt"
+                from chat_group_invites where invitee_id = :userId or inviter_id = :userId order by created_at""");
+        queries.put("chatMessagesDeletedForMe", "select message_id as \"messageId\", created_at as \"deletedAt\" "
+                + "from chat_message_hidden_for where user_id = :userId order by created_at");
+        queries.put("chatMessageEdits", """
+                select e.message_id as "messageId", e.body, e.edited_at as "editedAt"
+                from chat_message_edits e join chat_messages m on m.id = e.message_id
+                where m.sender_id = :userId order by e.id""");
+        queries.put("chatPins", "select conversation_id as \"conversationId\", message_id as \"messageId\", "
+                + "pinned_at as \"pinnedAt\" from chat_pins where pinned_by = :userId order by pinned_at");
+        queries.put("chatMentionsOfMe", "select message_id as \"messageId\" from chat_message_mentions "
+                + "where user_id = :userId order by message_id");
+        queries.put("chatReactions", "select message_id as \"messageId\", emoji, created_at as \"reactedAt\" "
+                + "from chat_message_reactions where user_id = :userId order by created_at");
+        queries.put("chatBlocks", """
+                select blocked_id as "blockedUserId", created_at as "blockedAt" from chat_blocks where blocker_id = :userId""");
+        queries.put("chatSettings", """
+                select lower(direct_messages) as "directMessages", show_presence as "showPresence"
+                from chat_settings where user_id = :userId""");
+        queries.put("chatPresence", """
+                select max(seen_at) as "lastSeenAt" from chat_presence where user_id = :userId having count(*) > 0""");
         return queries;
     }
 }

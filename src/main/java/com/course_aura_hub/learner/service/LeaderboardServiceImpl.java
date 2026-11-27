@@ -2,6 +2,7 @@ package com.course_aura_hub.learner.service;
 
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
+import com.course_aura_hub.common.util.DisplayNames;
 import com.course_aura_hub.course.model.Course;
 import com.course_aura_hub.course.model.CourseStatus;
 import com.course_aura_hub.course.repository.CourseRepository;
@@ -112,7 +113,7 @@ public class LeaderboardServiceImpl implements LeaderboardService {
             boolean you = row.studentId().equals(myId);
             if (i < size || you) {
                 LeaderboardDtos.Entry entry = new LeaderboardDtos.Entry(
-                        i + 1, displayName(row.name()), row.avatar(), row.xp(), row.lessons(), you);
+                        i + 1, DisplayNames.shortName(row.name()), row.avatar(), row.xp(), row.lessons(), you);
                 if (i < size) {
                     entries.add(entry);
                 }
@@ -195,14 +196,6 @@ public class LeaderboardServiceImpl implements LeaderboardService {
         return start.atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 
-    /** "Jane Learner" becomes "Jane L.", so a leaderboard never shows a full name. */
-    static String displayName(String name) {
-        if (!StringUtils.hasText(name)) {
-            return "Learner";
-        }
-        String[] parts = name.trim().split("\\s+");
-        return parts.length == 1 ? parts[0] : parts[0] + " " + parts[parts.length - 1].charAt(0) + ".";
-    }
 
     private static ZoneId resolveZone(String timeZone) {
         if (!StringUtils.hasText(timeZone)) {

@@ -2048,7 +2048,251 @@ BEGIN
 END $seed$;
 
 -- ===============================================================================================================
--- 19. Notifications, email preferences, browser push, Telegram
+-- 19. Chat: course channels, direct messages, private groups and invites, support, files, moderation
+-- ===============================================================================================================
+-- Members come only from real enrollments and course owners, groups have one owner, cursors never pass the last message
+CREATE FUNCTION seed_tmp.chat_say(p_conv int, p_sender uuid, p_kind text, p_body text, p_at timestamptz)
+    RETURNS int LANGUAGE plpgsql AS $fn$
+DECLARE
+    v_id int;
+BEGIN
+    INSERT INTO chat_messages (conversation_id, sender_id, client_message_id, kind, body, created_at)
+    VALUES (p_conv, p_sender, CASE WHEN p_kind = 'TEXT' THEN gen_random_uuid() END, p_kind, p_body, p_at)
+    RETURNING id INTO v_id;
+    UPDATE chat_conversations SET last_message_id = v_id, last_activity_at = p_at WHERE id = p_conv;
+    RETURN v_id;
+END $fn$;
+
+-- The name other learners see ("Jane L."), as DisplayNames.shortName writes it
+CREATE FUNCTION seed_tmp.short_name(p_user uuid) RETURNS text LANGUAGE sql STABLE AS
+$fn$ SELECT first_name || ' ' || left(last_name, 1) || '.' FROM users WHERE id = p_user $fn$;
+
+DO $seed$
+DECLARE
+    v_course record;
+    v_pair record;
+    v_conv int;
+    v_msg int;
+    v_group int;
+    v_owner uuid;
+    v_members uuid[];
+    v_sender uuid;
+    v_at timestamptz;
+    v_file uuid;
+    v_admin uuid := seed_tmp.admin_id();
+    v_learner uuid := seed_tmp.uid('sreymom.chea@demo.courseaurahub.io');
+    v_channel text[] := ARRAY['Has anyone finished the section 2 exercise?', 'The checklist at the end of lesson 4 really helped.',
+        'Is there a study group for this course?', 'I am stuck on the last quiz question, any hints?',
+        'Thanks for the clear explanations!', 'Which tools are you all using for the project?',
+        'Just got my certificate, good luck everyone!', 'Does the live class get recorded?'];
+    v_direct text[] := ARRAY['Hi! Are you also taking this course?', 'Yes, I am on section 3 now.',
+        'Want to review the quiz answers together?', 'Sure, tomorrow evening works for me.',
+        'I shared my notes in our group.', 'Thanks, that helps a lot!'];
+BEGIN
+    -- Course channels for the three busiest published courses that have an owner
+    FOR v_course IN
+        SELECT co.id, co.owner_id
+        FROM courses co
+        WHERE co.status = 'PUBLISHED' AND co.owner_id IS NOT NULL
+        ORDER BY (SELECT count(*) FROM student_courses sc WHERE sc.course_id = co.id) DESC, co.id
+        LIMIT 3
+    LOOP
+        v_at := now() - interval '45 days';
+        INSERT INTO chat_conversations (type, course_id, status, allow_member_invites, version, created_at, last_activity_at)
+        VALUES ('COURSE', v_course.id, 'ACTIVE', false, 0, v_at, v_at) RETURNING id INTO v_conv;
+        SELECT array_agg(user_id) INTO v_members FROM (
+            SELECT st.user_id FROM student_courses sc JOIN students st ON st.id = sc.student_id JOIN users u ON u.id = st.user_id
+            WHERE sc.course_id = v_course.id AND u.enabled ORDER BY random() LIMIT 12) m;
+        v_members := array_prepend(v_course.owner_id, coalesce(v_members, ARRAY[]::uuid[]));
+        INSERT INTO chat_participants (conversation_id, user_id, role, joined_at, last_read_message_id, last_delivered_message_id, muted)
+        SELECT v_conv, m, 'MEMBER', v_at + make_interval(hours => seed_tmp.rint(1, 200)), 0, 0, random() < 0.1
+        FROM unnest(v_members) AS m;
+        PERFORM seed_tmp.chat_say(v_conv, v_course.owner_id, 'TEXT',
+                'Welcome to the course chat! Ask questions here and help each other out.', v_at + interval '1 hour');
+        FOR k IN 1..9 LOOP
+            v_sender := v_members[1 + floor(random() * array_length(v_members, 1))::int];
+            v_msg := seed_tmp.chat_say(v_conv, v_sender, 'TEXT', seed_tmp.pick(v_channel), v_at + make_interval(days => k * 4));
+        END LOOP;
+        -- Course staff hid one off-topic message
+        v_msg := seed_tmp.chat_say(v_conv, v_members[array_length(v_members, 1)], 'TEXT', 'Selling cheap course notes, DM me!',
+                now() - interval '3 days');
+        UPDATE chat_messages SET hidden_at = now() - interval '2 days', hidden_by = v_course.owner_id WHERE id = v_msg;
+    END LOOP;
+
+    -- Direct conversations between learners who share a course, and with a course owner
+    FOR v_pair IN
+        SELECT DISTINCT ON (pair_key) a, b FROM (
+            SELECT least(sa.user_id, sb.user_id) AS a, greatest(sa.user_id, sb.user_id) AS b,
+                   least(sa.user_id, sb.user_id)::text || ':' || greatest(sa.user_id, sb.user_id)::text AS pair_key
+            FROM student_courses x JOIN student_courses y ON y.course_id = x.course_id AND y.student_id > x.student_id
+            JOIN students sa ON sa.id = x.student_id JOIN students sb ON sb.id = y.student_id
+            JOIN users ua ON ua.id = sa.user_id JOIN users ub ON ub.id = sb.user_id
+            JOIN courses co ON co.id = x.course_id
+            WHERE ua.enabled AND ub.enabled AND co.status = 'PUBLISHED'
+            ORDER BY random() LIMIT 400) p
+        LIMIT 14
+    LOOP
+        v_at := now() - make_interval(days => seed_tmp.rint(3, 40));
+        INSERT INTO chat_conversations (type, direct_key, status, created_by, allow_member_invites, version, created_at, last_activity_at)
+        VALUES ('DIRECT', v_pair.a::text || ':' || v_pair.b::text, 'ACTIVE', v_pair.a, false, 0, v_at, v_at)
+        ON CONFLICT DO NOTHING RETURNING id INTO v_conv;
+        CONTINUE WHEN v_conv IS NULL;
+        INSERT INTO chat_participants (conversation_id, user_id, role, joined_at, last_read_message_id, last_delivered_message_id, muted)
+        VALUES (v_conv, v_pair.a, 'MEMBER', v_at, 0, 0, false), (v_conv, v_pair.b, 'MEMBER', v_at, 0, 0, false);
+        FOR k IN 1..seed_tmp.rint(2, 6) LOOP
+            PERFORM seed_tmp.chat_say(v_conv, CASE WHEN k % 2 = 1 THEN v_pair.a ELSE v_pair.b END, 'TEXT', v_direct[k],
+                    v_at + make_interval(hours => k * 5));
+        END LOOP;
+    END LOOP;
+    SELECT co.owner_id, st.user_id INTO v_owner, v_sender
+    FROM courses co JOIN student_courses sc ON sc.course_id = co.id JOIN students st ON st.id = sc.student_id
+    WHERE co.owner_id IS NOT NULL AND co.status = 'PUBLISHED' AND st.user_id IS NOT NULL
+    ORDER BY co.id, sc.student_id LIMIT 1;
+    v_at := now() - interval '6 days';
+    INSERT INTO chat_conversations (type, direct_key, status, created_by, allow_member_invites, version, created_at, last_activity_at)
+    VALUES ('DIRECT', least(v_owner, v_sender)::text || ':' || greatest(v_owner, v_sender)::text, 'ACTIVE', v_sender, false, 0, v_at, v_at)
+    ON CONFLICT DO NOTHING RETURNING id INTO v_conv;
+    IF v_conv IS NOT NULL THEN
+        INSERT INTO chat_participants (conversation_id, user_id, role, joined_at, last_read_message_id, last_delivered_message_id, muted)
+        VALUES (v_conv, v_owner, 'MEMBER', v_at, 0, 0, false), (v_conv, v_sender, 'MEMBER', v_at, 0, 0, false);
+        PERFORM seed_tmp.chat_say(v_conv, v_sender, 'TEXT', 'Could you look at my assignment feedback when you have time?', v_at);
+        PERFORM seed_tmp.chat_say(v_conv, v_owner, 'TEXT', 'Of course. Your structure is good; tighten the conclusion.', v_at + interval '3 hours');
+        -- A file sent with a message, uploaded as a CHAT_ATTACHMENT
+        v_file := gen_random_uuid();
+        INSERT INTO stored_files (id, uploaded_by, purpose, object_key, content_type, size_bytes, original_name, status, created_at, updated_at)
+        VALUES (v_file, v_sender, 'CHAT_ATTACHMENT', 'private/chat/' || v_file || '.pdf', 'application/pdf', 182000,
+                'assignment-draft-v2.pdf', 'READY', v_at + interval '5 hours', v_at + interval '5 hours');
+        v_msg := seed_tmp.chat_say(v_conv, v_sender, 'TEXT', NULL, v_at + interval '5 hours');
+        INSERT INTO chat_attachments (message_id, file_ref, file_name, content_type, size_bytes)
+        VALUES (v_msg, 'storage://private/chat/' || v_file || '.pdf', 'assignment-draft-v2.pdf', 'application/pdf', 182000);
+        -- One the sender took back
+        v_msg := seed_tmp.chat_say(v_conv, v_sender, 'TEXT', NULL, v_at + interval '6 hours');
+        UPDATE chat_messages SET deleted_at = v_at + interval '6 hours 2 minutes' WHERE id = v_msg;
+    END IF;
+
+    -- Private groups in the busiest course: an active one with every invite state, and an archived one
+    SELECT co.id INTO v_course FROM courses co
+    WHERE co.status = 'PUBLISHED' ORDER BY (SELECT count(*) FROM student_courses sc WHERE sc.course_id = co.id) DESC, co.id LIMIT 1;
+    SELECT array_agg(user_id) INTO v_members FROM (
+        SELECT st.user_id FROM student_courses sc JOIN students st ON st.id = sc.student_id JOIN users u ON u.id = st.user_id
+        WHERE sc.course_id = v_course.id AND u.enabled ORDER BY st.id LIMIT 9) m;
+    v_owner := v_members[1];
+    v_at := now() - interval '20 days';
+    INSERT INTO chat_conversations (type, course_id, title, description, owner_id, allow_member_invites, status, created_by,
+                                    version, created_at, last_activity_at)
+    VALUES ('GROUP', v_course.id, 'Weekend study group', 'We meet on Saturdays to go through the week''s lessons.', v_owner,
+            true, 'ACTIVE', v_owner, 2, v_at, v_at)
+    RETURNING id INTO v_group;
+    INSERT INTO chat_participants (conversation_id, user_id, role, joined_at, last_read_message_id, last_delivered_message_id, muted)
+    VALUES (v_group, v_owner, 'OWNER', v_at, 0, 0, false);
+    PERFORM seed_tmp.chat_say(v_group, NULL, 'SYSTEM', seed_tmp.short_name(v_owner) || ' created the group', v_at);
+    FOR k IN 2..5 LOOP
+        INSERT INTO chat_group_invites (conversation_id, invitee_id, inviter_id, status, created_at, expires_at, responded_at)
+        VALUES (v_group, v_members[k], v_owner, 'ACCEPTED', v_at + interval '1 hour', v_at + interval '7 days 1 hour',
+                v_at + make_interval(hours => k * 3));
+        INSERT INTO chat_participants (conversation_id, user_id, role, joined_at, last_read_message_id, last_delivered_message_id, muted)
+        VALUES (v_group, v_members[k], CASE WHEN k = 2 THEN 'ADMIN' ELSE 'MEMBER' END, v_at + make_interval(hours => k * 3), 0, 0, k = 5);
+        PERFORM seed_tmp.chat_say(v_group, NULL, 'SYSTEM', seed_tmp.short_name(v_members[k]) || ' joined', v_at + make_interval(hours => k * 3));
+    END LOOP;
+    PERFORM seed_tmp.chat_say(v_group, v_owner, 'TEXT', 'Saturday 10am, lesson 5 and 6. Bring your questions!', v_at + interval '2 days');
+    PERFORM seed_tmp.chat_say(v_group, v_members[2], 'TEXT', 'I will prepare a summary of lesson 5.', v_at + interval '2 days 1 hour');
+    PERFORM seed_tmp.chat_say(v_group, v_members[3], 'TEXT', 'Great, see you there.', v_at + interval '2 days 3 hours');
+    -- A member who left, and invites still open, declined and expired
+    UPDATE chat_participants SET left_at = v_at + interval '10 days', left_reason = 'LEFT'
+    WHERE conversation_id = v_group AND user_id = v_members[5];
+    PERFORM seed_tmp.chat_say(v_group, NULL, 'SYSTEM', seed_tmp.short_name(v_members[5]) || ' left', v_at + interval '10 days');
+    INSERT INTO chat_group_invites (conversation_id, invitee_id, inviter_id, status, created_at, expires_at, responded_at)
+    VALUES (v_group, v_members[6], v_members[2], 'PENDING', now() - interval '1 day', now() + interval '6 days', NULL),
+           (v_group, v_members[7], v_owner, 'DECLINED', v_at + interval '1 day', v_at + interval '8 days', v_at + interval '2 days'),
+           (v_group, v_members[8], v_owner, 'EXPIRED', v_at, v_at + interval '7 days', v_at + interval '7 days');
+
+    v_at := now() - interval '90 days';
+    INSERT INTO chat_conversations (type, course_id, title, owner_id, allow_member_invites, status, created_by, version,
+                                    created_at, last_activity_at)
+    VALUES ('GROUP', v_course.id, 'Exam cram (finished)', v_members[9], false, 'ARCHIVED', v_members[9], 1, v_at, v_at)
+    RETURNING id INTO v_group;
+    INSERT INTO chat_participants (conversation_id, user_id, role, joined_at, last_read_message_id, last_delivered_message_id, muted)
+    VALUES (v_group, v_members[9], 'OWNER', v_at, 0, 0, false), (v_group, v_owner, 'MEMBER', v_at + interval '2 hours', 0, 0, false);
+    PERFORM seed_tmp.chat_say(v_group, NULL, 'SYSTEM', seed_tmp.short_name(v_members[9]) || ' created the group', v_at);
+    PERFORM seed_tmp.chat_say(v_group, v_members[9], 'TEXT', 'Good luck on the exam tomorrow!', v_at + interval '1 day');
+    PERFORM seed_tmp.chat_say(v_group, NULL, 'SYSTEM', seed_tmp.short_name(v_members[9]) || ' archived the group', v_at + interval '3 days');
+
+    -- Support: an open conversation the admins answered, and a closed one
+    v_at := now() - interval '2 days';
+    INSERT INTO chat_conversations (type, status, created_by, allow_member_invites, version, created_at, last_activity_at)
+    VALUES ('SUPPORT', 'OPEN', v_learner, false, 0, v_at, v_at) RETURNING id INTO v_conv;
+    INSERT INTO chat_participants (conversation_id, user_id, role, joined_at, last_read_message_id, last_delivered_message_id, muted)
+    VALUES (v_conv, v_learner, 'MEMBER', v_at, 0, 0, false);
+    PERFORM seed_tmp.chat_say(v_conv, v_learner, 'TEXT', 'My member card top-up from yesterday is not showing yet.', v_at);
+    PERFORM seed_tmp.chat_say(v_conv, v_admin, 'TEXT', 'Thanks for the receipt, we are checking it with the bank now.', v_at + interval '2 hours');
+    v_sender := v_members[3];
+    v_at := now() - interval '30 days';
+    INSERT INTO chat_conversations (type, status, created_by, allow_member_invites, version, created_at, last_activity_at)
+    VALUES ('SUPPORT', 'CLOSED', v_sender, false, 0, v_at, v_at) RETURNING id INTO v_conv;
+    INSERT INTO chat_participants (conversation_id, user_id, role, joined_at, last_read_message_id, last_delivered_message_id, muted)
+    VALUES (v_conv, v_sender, 'MEMBER', v_at, 0, 0, false);
+    PERFORM seed_tmp.chat_say(v_conv, v_sender, 'TEXT', 'How do I change the email on my account?', v_at);
+    PERFORM seed_tmp.chat_say(v_conv, v_admin, 'TEXT', 'Go to Settings, then Account, and choose Change email.', v_at + interval '1 hour');
+    PERFORM seed_tmp.chat_say(v_conv, NULL, 'SYSTEM', 'Support closed this conversation', v_at + interval '1 day');
+
+    -- Read and delivery cursors: most people are up to date, some are behind
+    UPDATE chat_participants p
+    SET last_delivered_message_id = coalesce(cv.last_message_id, 0),
+        last_read_message_id = CASE WHEN random() < 0.7 THEN coalesce(cv.last_message_id, 0)
+                                    ELSE coalesce((SELECT max(m.id) FROM chat_messages m
+                                                   WHERE m.conversation_id = p.conversation_id
+                                                     AND m.created_at < cv.last_activity_at - interval '1 day'), 0) END
+    FROM chat_conversations cv WHERE cv.id = p.conversation_id;
+    -- Senders have always read what they wrote
+    UPDATE chat_participants p
+    SET last_read_message_id = greatest(p.last_read_message_id,
+            (SELECT max(m.id) FROM chat_messages m WHERE m.conversation_id = p.conversation_id AND m.sender_id = p.user_id))
+    WHERE EXISTS (SELECT 1 FROM chat_messages m WHERE m.conversation_id = p.conversation_id AND m.sender_id = p.user_id);
+
+    -- Contact settings, a block, a chat restriction and a reported message
+    INSERT INTO chat_settings (user_id, direct_messages)
+    SELECT user_id, (ARRAY['STAFF_ONLY', 'NOBODY', 'COURSE_MEMBERS'])[1 + row_number() OVER (ORDER BY user_id) % 3]
+    FROM (SELECT user_id FROM seed_tmp.people WHERE kind = 'bulk' ORDER BY random() LIMIT 12) s;
+    INSERT INTO chat_blocks (blocker_id, blocked_id, created_at)
+    SELECT a, b, now() - interval '12 days' FROM (
+        SELECT p.user_id AS a, lead(p.user_id) OVER (ORDER BY p.user_id) AS b
+        FROM seed_tmp.people p WHERE p.kind = 'bulk') x
+    WHERE b IS NOT NULL LIMIT 3;
+    INSERT INTO chat_restrictions (user_id, until, reason, created_by, created_at)
+    SELECT m.sender_id, now() + interval '5 days', 'Advertising in the course chat', v_admin, now() - interval '2 days'
+    FROM chat_messages m WHERE m.hidden_at IS NOT NULL ORDER BY m.id LIMIT 1;
+    INSERT INTO content_reports (target_type, target_id, reporter_id, reason, status, resolved_by, resolved_at, created_at)
+    SELECT 'CHAT_MESSAGE', m.id, p.user_id, 'Spam or advertising', 'HIDDEN', v_admin, m.hidden_at, m.created_at + interval '1 hour'
+    FROM chat_messages m
+    JOIN chat_participants p ON p.conversation_id = m.conversation_id AND p.user_id <> m.sender_id
+    WHERE m.hidden_at IS NOT NULL
+    ORDER BY m.id, p.user_id LIMIT 1;
+    INSERT INTO content_reports (target_type, target_id, reporter_id, reason, status, created_at)
+    SELECT 'CHAT_MESSAGE', m.id, p.user_id, 'Rude message', 'OPEN', m.created_at + interval '30 minutes'
+    FROM chat_messages m
+    JOIN chat_conversations cv ON cv.id = m.conversation_id AND cv.type = 'DIRECT'
+    JOIN chat_participants p ON p.conversation_id = m.conversation_id AND p.user_id <> m.sender_id
+    WHERE m.kind = 'TEXT' AND m.body IS NOT NULL
+    ORDER BY m.id DESC LIMIT 1;
+END $seed$;
+
+-- A reply that quotes the message before it, and a message one participant deleted for themselves
+UPDATE chat_messages m
+SET reply_to_message_id = (SELECT p.id FROM chat_messages p
+                           WHERE p.conversation_id = m.conversation_id AND p.id < m.id AND p.kind = 'TEXT'
+                           ORDER BY p.id DESC LIMIT 1)
+WHERE m.id = (SELECT max(x.id) FROM chat_messages x JOIN chat_conversations c ON c.id = x.conversation_id
+              WHERE c.type = 'DIRECT' AND x.kind = 'TEXT' AND x.body IS NOT NULL AND x.deleted_at IS NULL);
+INSERT INTO chat_message_hidden_for (message_id, user_id, created_at)
+SELECT m.id, p.user_id, m.created_at + interval '1 hour'
+FROM chat_messages m
+JOIN chat_conversations c ON c.id = m.conversation_id AND c.type = 'DIRECT'
+JOIN chat_participants p ON p.conversation_id = m.conversation_id AND p.user_id <> m.sender_id
+WHERE m.kind = 'TEXT' AND m.body IS NOT NULL
+ORDER BY m.id LIMIT 1;
+
+-- ===============================================================================================================
+-- 20. Notifications, email preferences, browser push, Telegram
 -- ===============================================================================================================
 CREATE FUNCTION seed_tmp.read_at(p_at timestamptz) RETURNS timestamptz LANGUAGE sql VOLATILE AS
 $fn$ SELECT CASE WHEN p_at < now() - interval '4 days' AND random() < 0.85 THEN p_at + make_interval(hours => seed_tmp.rint(1, 30))
@@ -2244,7 +2488,7 @@ WHERE p.email IN ('vannak.kim@demo.courseaurahub.io', 'sokha.chan@demo.courseaur
    OR (p.kind = 'bulk' AND random() < 0.08);
 
 -- ===============================================================================================================
--- 20. Auth: sessions, one-time tokens, OAuth identities, audit trail
+-- 21. Auth: sessions, one-time tokens, OAuth identities, audit trail
 -- ===============================================================================================================
 DO $seed$
 DECLARE
@@ -2379,7 +2623,7 @@ BEGIN
 END $seed$;
 
 -- ===============================================================================================================
--- 21. Admin audit log, catalog analytics, scheduled job locks
+-- 22. Admin audit log, catalog analytics, scheduled job locks
 -- ===============================================================================================================
 INSERT INTO admin_audit_events (actor_id, actor_email, actor_role, action, http_method, path_pattern, resource, resource_id,
                                 path_variables, status, outcome, request_id, ip_address, created_at)
@@ -2440,7 +2684,7 @@ FROM unnest(ARRAY['auth-maintenance', 'catalog-events-prune', 'weekly-report', '
                   'subscription-renewals', 'telegram-polling', 'video-transcode']) AS name;
 
 -- ===============================================================================================================
--- 22. Derived values, exactly as the services keep them
+-- 23. Derived values, exactly as the services keep them
 -- ===============================================================================================================
 UPDATE courses c SET
     total_lessons = t.lessons,

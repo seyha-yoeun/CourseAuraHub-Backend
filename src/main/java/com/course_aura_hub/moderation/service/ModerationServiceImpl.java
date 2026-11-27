@@ -1,5 +1,6 @@
 package com.course_aura_hub.moderation.service;
 
+import com.course_aura_hub.chat.service.ChatModerationService;
 import com.course_aura_hub.common.exception.BusinessRuleException;
 import com.course_aura_hub.common.exception.ResourceNotFoundException;
 import com.course_aura_hub.common.security.Actor;
@@ -40,6 +41,7 @@ public class ModerationServiceImpl implements ModerationService {
     private final LessonAnswerRepository answerRepository;
     private final ReviewService reviewService;
     private final NotificationService notificationService;
+    private final ChatModerationService chatModerationService;
 
     /** The bits of a reported item an admin needs to see. */
     private record Target(String courseSlug, String text, String author, boolean hidden) {
@@ -49,6 +51,9 @@ public class ModerationServiceImpl implements ModerationService {
     @Transactional
     public void report(Actor actor, ModerationDtos.ReportRequest request) {
         ReportTargetType type = parseType(request.targetType());
+        if (type == ReportTargetType.CHAT_MESSAGE) {
+            chatModerationService.requireReportable(actor, request.targetId());
+        }
         Target target = load(type, request.targetId());
         if (target.hidden()) {
             return;
@@ -92,6 +97,7 @@ public class ModerationServiceImpl implements ModerationService {
             });
             case QUESTION -> questionRepository.findById(report.getTargetId()).ifPresent(question -> question.setHidden(true));
             case ANSWER -> answerRepository.findById(report.getTargetId()).ifPresent(answer -> answer.setHidden(true));
+            case CHAT_MESSAGE -> chatModerationService.hideReported(report.getTargetId(), adminId);
         }
         close(report, ReportStatus.HIDDEN, adminId);
         log.info("Content hidden type={} id={}", report.getTargetType(), report.getTargetId());
@@ -147,6 +153,10 @@ public class ModerationServiceImpl implements ModerationService {
             case ANSWER -> answerRepository.findById(id)
                     .map(answer -> new Target(courseSlugOf(answer), answer.getBody(), answer.getAuthorName(), answer.isHidden()))
                     .orElseThrow(() -> ResourceNotFoundException.of("Answer", id));
+            case CHAT_MESSAGE -> {
+                ChatModerationService.ReportTarget message = chatModerationService.reportTarget(id);
+                yield new Target(message.courseSlug(), message.text(), message.author(), message.hidden());
+            }
         };
     }
 
@@ -163,7 +173,7 @@ public class ModerationServiceImpl implements ModerationService {
         try {
             return ReportTargetType.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            throw new BusinessRuleException("You can report a review, question or answer");
+            throw new BusinessRuleException("You can report a review, question, answer or chat_message");
         }
     }
 }

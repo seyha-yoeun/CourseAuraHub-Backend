@@ -27,7 +27,13 @@ public interface FileService {
      */
     void requireOwned(String reference, String email, FilePurpose purpose);
 
-    /** Marks a replaced file for cleanup, if it is one this user uploaded. Other URLs are ignored. */
+    /**
+     * A finished upload this user made for this purpose, looked up by its id; the response's url is the
+     * storage:// reference for private purposes. Anything else is refused the same way as {@link #requireOwned}.
+     */
+    StoredFileResponse requireOwnedFile(UUID fileId, UUID userId, FilePurpose purpose);
+
+    /** Marks a replaced or deleted file (public URL or storage:// reference) for cleanup, if this user uploaded it. Other URLs are ignored. */
     void release(String url, UUID userId);
 
     void cleanUp();

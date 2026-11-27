@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,6 +54,23 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void notifyUsers(Collection<UUID> userIds, NotificationType type, String title, String message, String link) {
         save(List.copyOf(userIds), type, title, message, link);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void notifyUsersOnce(Collection<UUID> userIds, NotificationType type, String title, String message, String link) {
+        if (userIds.isEmpty()) {
+            return;
+        }
+        List<UUID> recipients = new ArrayList<>(new LinkedHashSet<>(userIds));
+        recipients.removeAll(notificationRepository.findUserIdsWithUnread(recipients, type, link));
+        save(recipients, type, title, message, link);
+    }
+
+    @Override
+    @Transactional
+    public void markReadByLink(UUID userId, NotificationType type, String link) {
+        notificationRepository.markReadByLink(userId, type, link, Instant.now());
     }
 
     @Override

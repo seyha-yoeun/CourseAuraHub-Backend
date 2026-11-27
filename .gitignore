@@ -41,3 +41,4 @@ build/
 
 ### MinIO: uploaded files and license ###
 /infrastructure/minio/
+.claude/
