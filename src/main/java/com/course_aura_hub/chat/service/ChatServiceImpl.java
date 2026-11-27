@@ -111,7 +111,7 @@ public class ChatServiceImpl implements ChatService {
             }
             after = "and (cv.last_activity_at, cv.id) < (:at, :cid)";
         }
-        List<Integer> ids = jdbc.queryForList("""
+        String listed = """
                 select cv.id
                 from chat_participants p
                 join chat_conversations cv on cv.id = p.conversation_id
@@ -120,21 +120,35 @@ public class ChatServiceImpl implements ChatService {
                   and (cv.type not in ('COURSE', 'GROUP')
                        or exists (select 1 from users u, courses c where u.id = :me and c.id = cv.course_id and %s))
                   %s
-                order by cv.last_activity_at desc, cv.id desc
-                limit :limit
-                """.formatted(hidden ? HIDDEN_SQL : SHOWN_SQL, ChatEligibility.ELIGIBLE_SQL, after), params, Integer.class);
+                """;
+        // The main list keeps pinned conversations out of its pages and puts them all first on page one
+        String pinnedFilter = hidden ? "" : "and p.pinned_at is null";
+        List<Integer> pinnedIds = hidden || StringUtils.hasText(cursor) ? List.of() : jdbc.queryForList(
+                listed.formatted(SHOWN_SQL, ChatEligibility.ELIGIBLE_SQL, "and p.pinned_at is not null")
+                        + " order by p.pinned_at desc", params, Integer.class);
+        List<Integer> ids = jdbc.queryForList(
+                listed.formatted(hidden ? HIDDEN_SQL : SHOWN_SQL, ChatEligibility.ELIGIBLE_SQL, pinnedFilter + " " + after)
+                        + " order by cv.last_activity_at desc, cv.id desc limit :limit", params, Integer.class);
         boolean more = ids.size() > size;
-        List<ChatDtos.Conversation> items = new ArrayList<>();
-        for (Integer id : more ? ids.subList(0, size) : ids) {
+        List<ChatDtos.Conversation> pinned = load(actor, pinnedIds);
+        List<ChatDtos.Conversation> page = load(actor, more ? ids.subList(0, size) : ids);
+        String next = null;
+        if (more && !page.isEmpty()) {
+            ChatDtos.Conversation last = page.getLast();
+            next = encodeCursor(last.lastActivityAt().toString(), last.id().toString());
+        }
+        List<ChatDtos.Conversation> items = new ArrayList<>(pinned);
+        items.addAll(page);
+        return new ChatDtos.ConversationPage(items, next);
+    }
+
+    private List<ChatDtos.Conversation> load(Actor actor, List<Integer> ids) {
+        List<ChatDtos.Conversation> items = new ArrayList<>(ids.size());
+        for (Integer id : ids) {
             conversationRepository.findById(id).ifPresent(conversation ->
                     items.add(views.conversation(actor.userId(), actor.admin(), access.requireReadable(actor, conversation))));
         }
-        String next = null;
-        if (more && !items.isEmpty()) {
-            ChatDtos.Conversation last = items.getLast();
-            next = encodeCursor(last.lastActivityAt().toString(), last.id().toString());
-        }
-        return new ChatDtos.ConversationPage(items, next);
+        return items;
     }
 
     @Override
@@ -243,6 +257,22 @@ public class ChatServiceImpl implements ChatService {
             participant.setMuted(request.muted());
         }
         participantRepository.saveAndFlush(participant);
+        if (request.pinned() != null) {
+            if (request.pinned() && participant.getPinnedAt() == null) {
+                Integer pinnedCount = jdbc.queryForObject(
+                        "select count(*) from chat_participants where user_id = :userId and left_at is null and pinned_at is not null",
+                        new MapSqlParameterSource("userId", actor.userId()), Integer.class);
+                if (pinnedCount != null && pinnedCount >= properties.maxPinnedConversations()) {
+                    throw new BusinessRuleException("You can pin up to " + properties.maxPinnedConversations()
+                            + " conversations. Unpin one first.");
+                }
+            }
+            Timestamp pinnedAt = jdbc.queryForObject("update chat_participants set pinned_at = case when :pinned "
+                            + "then coalesce(pinned_at, now()) end where conversation_id = :id and user_id = :userId returning pinned_at",
+                    new MapSqlParameterSource("pinned", request.pinned()).addValue("id", conversationId)
+                            .addValue("userId", actor.userId()), Timestamp.class);
+            participant.setPinnedAt(pinnedAt == null ? null : pinnedAt.toInstant());
+        }
         if (request.hidden() != null) {
             // The database clock, so it compares exactly with message times; the loaded row learns the same value,
             // so the response already says whether it's hidden

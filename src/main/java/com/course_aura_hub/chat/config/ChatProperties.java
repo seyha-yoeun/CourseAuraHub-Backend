@@ -19,6 +19,7 @@ import java.time.Duration;
  * @param editWindow              how long after sending people may edit their own message
  * @param maxAttachments          most files on one message
  * @param maxPins                 most messages pinned in one conversation
+ * @param maxPinnedConversations  most conversations one person may keep at the top of their list
  * @param messagesPerMinute       messages one user may send per minute
  * @param reactionsPerMinute      reactions one user may add or change per minute
  * @param directsPerDay           new direct conversations one user may start per day
@@ -41,6 +42,7 @@ public record ChatProperties(
         @DefaultValue("15m") Duration editWindow,
         @DefaultValue("5") int maxAttachments,
         @DefaultValue("5") int maxPins,
+        @DefaultValue("5") int maxPinnedConversations,
         @DefaultValue("30") int messagesPerMinute,
         @DefaultValue("60") int reactionsPerMinute,
         @DefaultValue("20") int directsPerDay,

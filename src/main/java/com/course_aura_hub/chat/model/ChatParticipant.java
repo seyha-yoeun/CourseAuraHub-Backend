@@ -73,6 +73,10 @@ public class ChatParticipant {
     @Column(name = "hidden_at")
     private Instant hiddenAt;
 
+    /** Kept at the top of this person's conversation list; null when not pinned */
+    @Column(name = "pinned_at")
+    private Instant pinnedAt;
+
     public boolean isActive() {
         return leftAt == null;
     }

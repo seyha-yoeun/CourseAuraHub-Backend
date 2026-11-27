@@ -408,6 +408,51 @@ class ChatMessagingIntegrationTest extends ChatTestSupport {
     }
 
     @Test
+    void pinnedConversations_leadTheFirstPage_upToTheLimit() throws Exception {
+        String slug = courseOwnedBy(registerInstructor());
+        TestUser jane = registerUser();
+        enroll(jane, slug);
+        java.util.List<Integer> chats = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            TestUser other = registerUser();
+            enroll(other, slug);
+            int conversation = openDirect(jane, other);
+            send(other, conversation, "hi " + i);
+            chats.add(conversation);
+        }
+        // The first one has the oldest activity, so it would be last in the list
+        int quiet = chats.getFirst();
+        mockMvc.perform(asJson(jane, patch(CHAT + "/conversations/" + quiet), Map.of("pinned", true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pinned").value(true));
+
+        String first = mockMvc.perform(as(jane, get(CHAT + "/conversations?limit=2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items", hasSize(3)))
+                .andExpect(jsonPath("$.data.items[0].id").value(quiet))
+                .andExpect(jsonPath("$.data.items[1].pinned").value(false))
+                .andExpect(jsonPath("$.data.nextCursor").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String cursor = JsonPath.read(first, "$.data.nextCursor");
+        // Later pages leave the pinned one out
+        mockMvc.perform(as(jane, get(CHAT + "/conversations").param("cursor", cursor).param("limit", "10")))
+                .andExpect(jsonPath("$.data.items", hasSize(3)))
+                .andExpect(jsonPath("$.data.items[?(@.id == " + quiet + ")]").isEmpty());
+
+        for (int i = 1; i < 5; i++) {
+            mockMvc.perform(asJson(jane, patch(CHAT + "/conversations/" + chats.get(i)), Map.of("pinned", true)))
+                    .andExpect(status().isOk());
+        }
+        mockMvc.perform(asJson(jane, patch(CHAT + "/conversations/" + chats.get(5)), Map.of("pinned", true)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(asJson(jane, patch(CHAT + "/conversations/" + quiet), Map.of("pinned", false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pinned").value(false));
+        mockMvc.perform(asJson(jane, patch(CHAT + "/conversations/" + chats.get(5)), Map.of("pinned", true)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void replies_quoteAnEarlierMessage_andOnlyFromTheSameConversation() throws Exception {
         String slug = courseOwnedBy(registerInstructor());
         TestUser jane = registerUser();

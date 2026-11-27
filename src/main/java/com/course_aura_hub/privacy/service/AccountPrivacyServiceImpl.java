@@ -283,7 +283,8 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                 where m.sender_id = :userId and m.kind = 'TEXT' order by m.id""");
         queries.put("chatMemberships", """
                 select p.conversation_id as "conversationId", lower(cv.type) as "conversationType", cv.title,
-                       lower(p.role) as role, p.joined_at as "joinedAt", p.left_at as "leftAt", p.muted
+                       lower(p.role) as role, p.joined_at as "joinedAt", p.left_at as "leftAt", p.muted,
+                       p.pinned_at as "pinnedAt"
                 from chat_participants p join chat_conversations cv on cv.id = p.conversation_id
                 where p.user_id = :userId order by p.joined_at""");
         queries.put("chatInvites", """

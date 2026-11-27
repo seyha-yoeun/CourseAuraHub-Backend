@@ -101,6 +101,7 @@ public class ChatViews {
                 participant == null || !participant.isActive() ? 0 : unread(conversation.getId(), viewerId, participant.getLastReadMessageId()),
                 participant != null && participant.isMuted(),
                 isHidden(conversation, participant),
+                participant != null && participant.isActive() && participant.getPinnedAt() != null,
                 view.canSend(),
                 view.readOnlyReason(),
                 participant == null || !participant.isActive() ? null : lower(participant.getRole()),

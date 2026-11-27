@@ -47,8 +47,9 @@ public class ChatController {
 
     @GetMapping("/api/v1/me/chat/conversations")
     @Operation(summary = "My conversations",
-            description = "Any signed-in user. Most recent activity first; pass nextCursor to page. With hidden=true, "
-                    + "only the ones I hid from my list that have had no new message since.")
+            description = "Any signed-in user. Most recent activity first; pass nextCursor to page. The first page starts "
+                    + "with every conversation I pinned. With hidden=true, only the ones I hid from my list that have "
+                    + "had no new message since.")
     public ResponseEntity<ApiResponse<ChatDtos.ConversationPage>> conversations(
             @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "20") int limit,

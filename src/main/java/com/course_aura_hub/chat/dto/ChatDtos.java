@@ -59,8 +59,8 @@ public final class ChatDtos {
     ) {
     }
 
-    /** Only the fields that are set change. */
-    public record ConversationUpdateRequest(Boolean muted, Boolean hidden) {
+    /** Only the fields that are set change. {@code pinned} keeps it at the top of my list. */
+    public record ConversationUpdateRequest(Boolean muted, Boolean hidden, Boolean pinned) {
     }
 
     /** @param showPresence whether direct contacts see when I'm active; unchanged when null */
@@ -205,6 +205,7 @@ public final class ChatDtos {
     /**
      * @param peer           the other person, for direct conversations
      * @param hidden         I hid it from my list and no message has arrived since
+     * @param pinned         I keep it at the top of my list
      * @param readOnlyReason why you can't send right now, or null when you can
      * @param myRole         owner, admin or member in a group; member elsewhere; null without a membership
      * @param peerReceipt    direct conversations only
@@ -223,6 +224,7 @@ public final class ChatDtos {
             long unread,
             boolean muted,
             boolean hidden,
+            boolean pinned,
             boolean canSend,
             String readOnlyReason,
             String myRole,
