@@ -300,6 +300,7 @@ app:
     groups-per-day: ${CHAT_GROUPS_PER_DAY:5}
     invites-per-day: ${CHAT_INVITES_PER_DAY:50}
     directory-queries-per-minute: ${CHAT_DIRECTORY_QUERIES_PER_MINUTE:60}
+    searches-per-minute: ${CHAT_SEARCHES_PER_MINUTE:30}
     # Expires invites and takes members who lost course access out of their groups
     maintenance-cron: ${CHAT_MAINTENANCE_CRON:0 7 * * * *}
     # Presence ("Active now"): each instance refreshes its users this often (ISO-8601, also read by @Scheduled);

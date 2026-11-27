@@ -152,6 +152,24 @@ public class ChatViews {
                 && !conversation.getLastActivityAt().isAfter(participant.getHiddenAt());
     }
 
+    /** A conversation's id, kind and name as the viewer sees it, without the rest (for search hits). */
+    public ChatDtos.ConversationRef conversationRef(UUID viewerId, boolean viewerIsAdmin, ChatAccess.View view) {
+        ChatConversation conversation = view.conversation();
+        Set<UUID> ids = new HashSet<>();
+        if (view.peerId() != null) {
+            ids.add(view.peerId());
+        }
+        if (conversation.getType() == ConversationType.SUPPORT && conversation.getCreatedBy() != null) {
+            ids.add(conversation.getCreatedBy());
+        }
+        Map<UUID, ChatDtos.Person> named = people.lookup(viewerId, ids);
+        ChatDtos.Person peer = view.peerId() == null ? null : named.get(view.peerId());
+        Course course = view.course();
+        return new ChatDtos.ConversationRef(conversation.getId(), lower(conversation.getType()),
+                title(conversation, course, peer, named, viewerId, viewerIsAdmin),
+                course == null ? null : new ChatDtos.CourseRef(course.getId(), course.getSlug(), course.getTitle()), peer);
+    }
+
     public List<ChatDtos.Message> messages(UUID viewerId, List<ChatMessage> messages) {
         if (messages.isEmpty()) {
             return List.of();

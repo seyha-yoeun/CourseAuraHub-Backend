@@ -1,5 +1,6 @@
 package com.course_aura_hub.chat.controller;
 
+import com.course_aura_hub.chat.service.ChatSearchService;
 import com.course_aura_hub.chat.service.ChatService;
 import com.course_aura_hub.auth.security.AuthUserPrincipal;
 import com.course_aura_hub.chat.dto.ChatDtos;
@@ -9,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +38,7 @@ import java.util.UUID;
 public class ChatController {
 
     private final ChatService chatService;
+    private final ChatSearchService searchService;
 
     @PostMapping("/api/v1/me/chat/socket-ticket")
     @Operation(summary = "Get a WebSocket ticket",
@@ -56,6 +60,25 @@ public class ChatController {
             @RequestParam(defaultValue = "false") boolean hidden,
             @AuthenticationPrincipal AuthUserPrincipal user) {
         return ResponseEntity.ok(ApiResponse.success(chatService.conversations(Actor.of(user), cursor, limit, hidden)));
+    }
+
+    @GetMapping("/api/v1/me/chat/search")
+    @Operation(summary = "Search my messages",
+            description = "Any signed-in user. Finds text anywhere in messages (Khmer too) in conversations I'm a member "
+                    + "of, newest first; filter by conversation, sender, has=file|image|link and a from/to time. Pass "
+                    + "nextCursor as before for older hits.")
+    public ResponseEntity<ApiResponse<ChatDtos.SearchPage>> search(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer conversationId,
+            @RequestParam(required = false) UUID senderId,
+            @RequestParam(required = false) String has,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+            @RequestParam(required = false) Integer before,
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal AuthUserPrincipal user) {
+        return ResponseEntity.ok(ApiResponse.success(searchService.search(Actor.of(user),
+                new ChatDtos.SearchRequest(q, conversationId, senderId, has, from, to, before, limit))));
     }
 
     @GetMapping("/api/v1/me/chat/unread-count")

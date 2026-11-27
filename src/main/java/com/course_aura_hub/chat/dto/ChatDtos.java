@@ -47,6 +47,19 @@ public final class ChatDtos {
     public record ReadRequest(@NotNull(message = "messageId is required") @Positive Integer messageId) {
     }
 
+    /**
+     * A message search.
+     *
+     * @param q      the text to find (2 to 100 characters); may be left out when {@code has} is set
+     * @param has    file, image or link
+     * @param from   messages sent at or after this moment
+     * @param to     messages sent before this moment
+     * @param before a page cursor: messages older than this id
+     */
+    public record SearchRequest(String q, Integer conversationId, UUID senderId, String has, Instant from, Instant to,
+                                Integer before, int limit) {
+    }
+
     /** The new text; may be empty only when the message has files. */
     public record EditMessageRequest(
             @Size(max = MAX_BODY_LENGTH, message = "Messages can be at most 4000 characters") String body
@@ -170,6 +183,17 @@ public final class ChatDtos {
     }
 
     public record MessagePage(List<Message> items, boolean hasMore) {
+    }
+
+    /** A conversation a search hit is in, named for the viewer. @param peer the other person, for direct ones */
+    public record ConversationRef(Integer id, String type, String title, CourseRef course, Person peer) {
+    }
+
+    public record SearchHit(Message message, ConversationRef conversation) {
+    }
+
+    /** @param nextCursor pass as {@code before} for older hits; null when there are none */
+    public record SearchPage(List<SearchHit> items, String nextCursor) {
     }
 
     public record CourseRef(Integer id, String slug, String title) {

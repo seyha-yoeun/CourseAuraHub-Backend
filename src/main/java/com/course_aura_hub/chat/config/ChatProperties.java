@@ -26,6 +26,7 @@ import java.time.Duration;
  * @param groupsPerDay            groups one user may create per day
  * @param invitesPerDay           group invites one user may send per day
  * @param directoryQueriesPerMinute course member searches one user may run per minute
+ * @param searchesPerMinute       message searches one user may run per minute
  * @param maintenanceCron         when the group clean-up runs (expired invites, members who lost access)
  * @param presenceHeartbeat       how often each instance refreshes the presence of the users connected to it
  * @param presenceGrace           how long after someone's last session closes before they show as offline
@@ -49,6 +50,7 @@ public record ChatProperties(
         @DefaultValue("5") int groupsPerDay,
         @DefaultValue("50") int invitesPerDay,
         @DefaultValue("60") int directoryQueriesPerMinute,
+        @DefaultValue("30") int searchesPerMinute,
         @DefaultValue("0 7 * * * *") String maintenanceCron,
         @DefaultValue("PT30S") Duration presenceHeartbeat,
         @DefaultValue("PT20S") Duration presenceGrace
