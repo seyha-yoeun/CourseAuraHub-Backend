@@ -300,6 +300,8 @@ public class AccountPrivacyServiceImpl implements AccountPrivacyService {
                 where m.sender_id = :userId order by e.id""");
         queries.put("chatPins", "select conversation_id as \"conversationId\", message_id as \"messageId\", "
                 + "pinned_at as \"pinnedAt\" from chat_pins where pinned_by = :userId order by pinned_at");
+        queries.put("chatMentionsOfMe", "select message_id as \"messageId\" from chat_message_mentions "
+                + "where user_id = :userId order by message_id");
         queries.put("chatReactions", "select message_id as \"messageId\", emoji, created_at as \"reactedAt\" "
                 + "from chat_message_reactions where user_id = :userId order by created_at");
         queries.put("chatBlocks", """

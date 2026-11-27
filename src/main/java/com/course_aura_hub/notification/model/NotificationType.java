@@ -18,6 +18,7 @@ public enum NotificationType {
     PAYOUT,
     LESSON_QUESTION,
     CHAT_MESSAGE,
+    CHAT_MENTION,
     ASSIGNMENT,
     COURSE_REVIEW,
     COURSE_SURVEY,

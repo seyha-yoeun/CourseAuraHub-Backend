@@ -377,6 +377,7 @@ public class ChatServiceImpl implements ChatService {
             participantRepository.advanceRead(conversationId, me, message.getId());
         }
         notifyOffline(view, message, me, files.size());
+        saveMentions(view, message, me, request.mentionUserIds(), files.size());
         events.publishEvent(ChatSignal.message(ChatSignal.Kind.MESSAGE_CREATED, conversationId, message.getId(), me));
         return views.message(me, message);
     }
@@ -437,7 +438,7 @@ public class ChatServiceImpl implements ChatService {
         ChatMessage message = messageRepository.findById(messageId).orElseThrow(() -> ResourceNotFoundException.of("Message", messageId));
         // Editing is writing: blocked, archived, closed and restricted conversations refuse it, and the conversation
         // row is locked first, in the order sends use
-        access.requireWritable(actor, message.getConversationId());
+        ChatAccess.View view = access.requireWritable(actor, message.getConversationId());
         if (message.getKind() != MessageKind.TEXT || !me.equals(message.getSenderId())) {
             throw new ForbiddenActionException("You can only edit your own messages");
         }
@@ -463,6 +464,10 @@ public class ChatServiceImpl implements ChatService {
         message.setBody(body);
         message.setEditedAt(Instant.now());
         messageRepository.save(message);
+        // Left out, the mentions stay as they were; a list (even an empty one) replaces them
+        if (request != null && request.mentionUserIds() != null) {
+            saveMentions(view, message, me, request.mentionUserIds(), attachmentRepository.findByMessageId(messageId).size());
+        }
         events.publishEvent(ChatSignal.message(ChatSignal.Kind.MESSAGE_UPDATED, message.getConversationId(), messageId, me));
         return views.message(me, message);
     }
@@ -773,6 +778,8 @@ public class ChatServiceImpl implements ChatService {
         files.forEach(file -> fileService.release(file, userId));
         jdbc.update("delete from chat_attachments a using chat_messages m where m.id = a.message_id and m.sender_id = :userId", params);
         jdbc.update("delete from chat_message_edits e using chat_messages m where m.id = e.message_id and m.sender_id = :userId", params);
+        jdbc.update("delete from chat_message_mentions mm using chat_messages m where m.id = mm.message_id and m.sender_id = :userId", params);
+        jdbc.update("delete from chat_message_mentions where user_id = :userId", params);
         jdbc.update("""
                 update chat_messages set body = null, deleted_at = coalesce(deleted_at, now()), sender_id = null
                 where sender_id = :userId
@@ -855,6 +862,48 @@ public class ChatServiceImpl implements ChatService {
                 // Too noisy to notify a whole course; the channel shows unread counts instead
             }
         }
+    }
+
+    /**
+     * Keeps who a message @mentions: in group and course chats only, people who can read it, never the sender.
+     * Those newly mentioned are notified, muted or not, unless they blocked the sender. On an edit, people no
+     * longer in the list are dropped and only new ones are notified.
+     */
+    private void saveMentions(ChatAccess.View view, ChatMessage message, UUID sender, List<UUID> requested, int attachments) {
+        ChatConversation conversation = view.conversation();
+        boolean mentionable = conversation.getType() == ConversationType.GROUP || conversation.getType() == ConversationType.COURSE;
+        Set<UUID> wanted = new LinkedHashSet<>(requested == null ? List.of() : requested);
+        wanted.remove(null);
+        wanted.remove(sender);
+        Set<UUID> allowed = !mentionable || wanted.isEmpty() ? Set.of() : access.readersAmong(conversation, wanted);
+        MapSqlParameterSource params = new MapSqlParameterSource("messageId", message.getId());
+        Set<UUID> existing = new HashSet<>(jdbc.queryForList(
+                "select user_id from chat_message_mentions where message_id = :messageId", params, UUID.class));
+        if (allowed.isEmpty()) {
+            jdbc.update("delete from chat_message_mentions where message_id = :messageId", params);
+        } else {
+            jdbc.update("delete from chat_message_mentions where message_id = :messageId and user_id not in (:keep)",
+                    new MapSqlParameterSource("messageId", message.getId()).addValue("keep", allowed));
+        }
+        List<UUID> added = allowed.stream().filter(userId -> !existing.contains(userId)).toList();
+        if (added.isEmpty()) {
+            return;
+        }
+        jdbc.batchUpdate("insert into chat_message_mentions (message_id, user_id) values (:messageId, :userId) on conflict do nothing",
+                added.stream().map(userId -> new MapSqlParameterSource("messageId", message.getId()).addValue("userId", userId))
+                        .toArray(MapSqlParameterSource[]::new));
+        Set<UUID> blockedMe = new HashSet<>(jdbc.queryForList(
+                "select blocker_id from chat_blocks where blocked_id = :sender and blocker_id in (:added)",
+                new MapSqlParameterSource("sender", sender).addValue("added", added), UUID.class));
+        List<UUID> recipients = added.stream().filter(userId -> !blockedMe.contains(userId)).toList();
+        if (recipients.isEmpty()) {
+            return;
+        }
+        String where = conversation.getType() == ConversationType.COURSE && view.course() != null
+                ? view.course().getTitle() : conversation.getTitle();
+        notificationService.notifyUsers(recipients, NotificationType.CHAT_MENTION,
+                people.publicName(sender) + " mentioned you in " + where, ChatViews.preview(message, attachments),
+                link(conversation.getId()) + "?message=" + message.getId());
     }
 
     private boolean isMuted(Integer conversationId, UUID userId) {

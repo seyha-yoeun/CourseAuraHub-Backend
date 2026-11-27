@@ -100,6 +100,7 @@ public class ChatViews {
                 peer,
                 last == null ? null : lastMessage(last, named),
                 participant == null || !participant.isActive() ? 0 : unread(conversation.getId(), viewerId, participant.getLastReadMessageId()),
+                participant == null || !participant.isActive() ? 0 : unreadMentions(conversation.getId(), viewerId, participant.getLastReadMessageId()),
                 participant != null && participant.isMuted(),
                 isHidden(conversation, participant),
                 participant != null && participant.isActive() && participant.getPinnedAt() != null,
@@ -181,10 +182,12 @@ public class ChatViews {
         Map<Integer, ChatMessage> quoted = replyIds.isEmpty() ? Map.of()
                 : messageRepository.findAllById(replyIds).stream().collect(Collectors.toMap(ChatMessage::getId, item -> item));
         Map<Integer, Map<String, Tally>> reactions = reactions(viewerId, messages);
+        Map<Integer, List<UUID>> mentioned = mentions(messages);
         Set<UUID> senders = new HashSet<>();
         messages.forEach(message -> senders.add(message.getSenderId()));
         quoted.values().forEach(message -> senders.add(message.getSenderId()));
         reactions.values().forEach(byEmoji -> byEmoji.values().forEach(tally -> senders.addAll(tally.recent)));
+        mentioned.values().forEach(senders::addAll);
         senders.remove(null);
         Map<UUID, ChatDtos.Person> named = people.lookup(viewerId, senders);
         List<Integer> withFiles = new ArrayList<>(messages.stream().map(ChatMessage::getId).toList());
@@ -195,8 +198,10 @@ public class ChatViews {
         for (ChatMessage message : messages) {
             ChatMessage target = message.getReplyToMessageId() == null ? null : quoted.get(message.getReplyToMessageId());
             ChatDtos.ReplyRef reply = target == null ? null : replyRef(target, named, files.getOrDefault(target.getId(), List.of()).size());
+            List<ChatDtos.Person> mentions = mentioned.getOrDefault(message.getId(), List.of()).stream()
+                    .map(named::get).filter(java.util.Objects::nonNull).toList();
             views.add(message(viewerId, message, named, files.getOrDefault(message.getId(), List.of()), reply,
-                    reactionViews(reactions.get(message.getId()), named)));
+                    reactionViews(reactions.get(message.getId()), named), mentions));
         }
         return views;
     }
@@ -276,6 +281,35 @@ public class ChatViews {
         return messages(viewerId, List.of(message)).getFirst();
     }
 
+    /** Who each of these messages @mentions, for the ones still showing. */
+    private Map<Integer, List<UUID>> mentions(List<ChatMessage> messages) {
+        List<Integer> ids = messages.stream()
+                .filter(message -> message.getKind() == MessageKind.TEXT && message.getDeletedAt() == null && message.getHiddenAt() == null)
+                .map(ChatMessage::getId)
+                .toList();
+        Map<Integer, List<UUID>> out = new HashMap<>();
+        if (ids.isEmpty()) {
+            return out;
+        }
+        jdbc.query("select message_id, user_id from chat_message_mentions where message_id in (:ids)",
+                new MapSqlParameterSource("ids", ids), row -> {
+                    out.computeIfAbsent(row.getInt("message_id"), ignored -> new ArrayList<>()).add(row.getObject("user_id", UUID.class));
+                });
+        return out;
+    }
+
+    /** Unread messages that @mention this person, after their read cursor. */
+    public long unreadMentions(Integer conversationId, UUID userId, int lastReadMessageId) {
+        Long count = jdbc.queryForObject("""
+                select count(*) from chat_message_mentions mm join chat_messages m on m.id = mm.message_id
+                where mm.user_id = :userId and m.conversation_id = :conversationId and m.id > :cursor
+                  and m.deleted_at is null and m.hidden_at is null
+                  and not exists (select 1 from chat_message_hidden_for h where h.message_id = m.id and h.user_id = :userId)
+                """, new MapSqlParameterSource("conversationId", conversationId)
+                .addValue("cursor", lastReadMessageId).addValue("userId", userId), Long.class);
+        return count == null ? 0 : count;
+    }
+
     /** Unread messages others wrote after this cursor. */
     public long unread(Integer conversationId, UUID userId, int lastReadMessageId) {
         Long count = jdbc.queryForObject("""
@@ -352,7 +386,8 @@ public class ChatViews {
     }
 
     private ChatDtos.Message message(UUID viewerId, ChatMessage message, Map<UUID, ChatDtos.Person> named,
-                                     List<ChatAttachment> files, ChatDtos.ReplyRef replyTo, List<ChatDtos.Reaction> reactions) {
+                                     List<ChatAttachment> files, ChatDtos.ReplyRef replyTo, List<ChatDtos.Reaction> reactions,
+                                     List<ChatDtos.Person> mentions) {
         boolean deleted = message.getDeletedAt() != null;
         boolean hidden = message.getHiddenAt() != null;
         boolean visible = !deleted && !hidden;
@@ -367,7 +402,8 @@ public class ChatViews {
         }
         return new ChatDtos.Message(message.getId(), message.getConversationId(), lower(message.getKind()), sender,
                 visible ? message.getBody() : null, deleted, hidden, attachments, replyTo, visible ? reactions : List.of(),
-                mine ? message.getClientMessageId() : null, mine, message.getCreatedAt(), visible ? message.getEditedAt() : null);
+                mine ? message.getClientMessageId() : null, mine, message.getCreatedAt(), visible ? message.getEditedAt() : null,
+                visible ? mentions : List.of());
     }
 
     private String title(ChatConversation conversation, Course course, ChatDtos.Person peer,

@@ -18,6 +18,7 @@ import java.util.UUID;
 public final class ChatDtos {
 
     public static final int MAX_BODY_LENGTH = 4000;
+    public static final int MAX_MENTIONS = 20;
 
     private ChatDtos() {
     }
@@ -36,11 +37,17 @@ public final class ChatDtos {
             @Size(max = MAX_BODY_LENGTH, message = "Messages can be at most 4000 characters") String body,
             @Size(max = 5, message = "Attach at most 5 files") List<UUID> attachmentIds,
             // An earlier message in the same conversation this one replies to
-            Integer replyToMessageId
+            Integer replyToMessageId,
+            // People the text @mentions (group and course chats); only those who can read the conversation count
+            @Size(max = MAX_MENTIONS, message = "Mention at most 20 people") List<UUID> mentionUserIds
     ) {
 
         public SendMessageRequest(UUID clientMessageId, String body, List<UUID> attachmentIds) {
-            this(clientMessageId, body, attachmentIds, null);
+            this(clientMessageId, body, attachmentIds, null, null);
+        }
+
+        public SendMessageRequest(UUID clientMessageId, String body, List<UUID> attachmentIds, Integer replyToMessageId) {
+            this(clientMessageId, body, attachmentIds, replyToMessageId, null);
         }
     }
 
@@ -60,9 +67,14 @@ public final class ChatDtos {
                                 Integer before, int limit) {
     }
 
-    /** The new text; may be empty only when the message has files. */
+    /**
+     * The new text; may be empty only when the message has files.
+     *
+     * @param mentionUserIds who the new text @mentions; left out, the mentions stay as they were
+     */
     public record EditMessageRequest(
-            @Size(max = MAX_BODY_LENGTH, message = "Messages can be at most 4000 characters") String body
+            @Size(max = MAX_BODY_LENGTH, message = "Messages can be at most 4000 characters") String body,
+            @Size(max = MAX_MENTIONS, message = "Mention at most 20 people") List<UUID> mentionUserIds
     ) {
     }
 
@@ -120,7 +132,7 @@ public final class ChatDtos {
     // ---- WebSocket commands (/app/chat.*) ----
 
     public record SocketSend(Integer conversationId, UUID clientMessageId, String body, List<UUID> attachmentIds,
-                             Integer replyToMessageId) {
+                             Integer replyToMessageId, List<UUID> mentionUserIds) {
     }
 
     public record SocketCursor(Integer conversationId, Integer messageId) {
@@ -163,6 +175,7 @@ public final class ChatDtos {
      * @param body            null once the message is deleted or hidden
      * @param clientMessageId only on your own messages
      * @param editedAt        when the sender last edited it, or null
+     * @param mentions        people it @mentions; empty once deleted or hidden
      */
     public record Message(
             Integer id,
@@ -178,7 +191,8 @@ public final class ChatDtos {
             UUID clientMessageId,
             boolean mine,
             Instant createdAt,
-            Instant editedAt
+            Instant editedAt,
+            List<Person> mentions
     ) {
     }
 
@@ -228,6 +242,7 @@ public final class ChatDtos {
 
     /**
      * @param peer           the other person, for direct conversations
+     * @param unreadMentions unread messages that @mention me
      * @param hidden         I hid it from my list and no message has arrived since
      * @param pinned         I keep it at the top of my list
      * @param readOnlyReason why you can't send right now, or null when you can
@@ -246,6 +261,7 @@ public final class ChatDtos {
             Person peer,
             LastMessage lastMessage,
             long unread,
+            long unreadMentions,
             boolean muted,
             boolean hidden,
             boolean pinned,
