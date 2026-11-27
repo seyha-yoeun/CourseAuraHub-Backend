@@ -30,6 +30,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** Builds chat responses for one viewer: names, signed attachment links, unread counts. */
@@ -321,8 +322,28 @@ public class ChatViews {
         if (body == null || body.isBlank()) {
             return attachments > 1 ? "Sent " + attachments + " files" : "Sent a file";
         }
-        String flat = body.strip().replaceAll("\\s+", " ");
+        String flat = plainText(body).strip().replaceAll("\\s+", " ");
+        if (flat.isEmpty()) {
+            return attachments > 1 ? "Sent " + attachments + " files" : "Sent a file";
+        }
         return flat.length() <= PREVIEW_LENGTH ? flat : flat.substring(0, PREVIEW_LENGTH - 1) + "…";
+    }
+
+    private static final Pattern FENCE = Pattern.compile("```[\\w+#.-]*");
+    private static final Pattern BOLD = Pattern.compile("\\*\\*([^\\n]+?)\\*\\*");
+    private static final Pattern STRIKE = Pattern.compile("~~([^\\n]+?)~~");
+    private static final Pattern ITALIC = Pattern.compile("(?<![\\p{L}\\p{N}_])_([^_\\n]+?)_(?![\\p{L}\\p{N}_])");
+
+    /**
+     * Message text without its formatting marks (```code```, **bold**, _italic_, ~~strike~~, `code`), for list
+     * previews and notifications. The web app renders the marks; keep this in step with stripFormatting there.
+     */
+    static String plainText(String body) {
+        String text = FENCE.matcher(body).replaceAll("");
+        text = BOLD.matcher(text).replaceAll("$1");
+        text = STRIKE.matcher(text).replaceAll("$1");
+        text = ITALIC.matcher(text).replaceAll("$1");
+        return text.replace("`", "");
     }
 
     private int attachmentCount(ChatMessage message) {
